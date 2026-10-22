@@ -119,6 +119,40 @@ NavMeshSettings:
     debug:
       m_Flags: 0
   m_NavMeshData: {fileID: 0}
+--- !u!1 &385149510
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 385149511}
+  m_Layer: 0
+  m_Name: --- Camera & Lights ---
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &385149511
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 385149510}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children:
+  - {fileID: 479738324}
+  - {fileID: 1921602201}
+  - {fileID: 883870322}
+  m_Father: {fileID: 0}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1 &479738320
 GameObject:
   m_ObjectHideFlags: 0
@@ -349,7 +383,7 @@ Transform:
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
-  m_Father: {fileID: 0}
+  m_Father: {fileID: 385149511}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1 &643343493
 GameObject:
@@ -361,7 +395,7 @@ GameObject:
   m_Component:
   - component: {fileID: 643343495}
   m_Layer: 0
-  m_Name: Sokoban - WASD or arrows, R to restart
+  m_Name: --- LevelRoot ---
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
@@ -424,12 +458,12 @@ Transform:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 883870320}
   serializedVersion: 2
-  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalRotation: {x: -0, y: -0, z: -0, w: 1}
   m_LocalPosition: {x: 0, y: 0, z: 0}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
-  m_Father: {fileID: 0}
+  m_Father: {fileID: 385149511}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1 &1921602198
 GameObject:
@@ -669,7 +703,7 @@ Transform:
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
-  m_Father: {fileID: 0}
+  m_Father: {fileID: 385149511}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1 &2140444729
 GameObject:
@@ -703,8 +737,8 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: fc7c2dbf773748a68f7fd3c544ca2b35, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  _viewCatalog: {fileID: 11400000, guid: eba0a2047ae674441a6a83abed2ce8a4, type: 2}
-  _levelRoot: {fileID: 643343495}
+  levelRoot: {fileID: 643343495}
+  viewCatalog: {fileID: 11400000, guid: eba0a2047ae674441a6a83abed2ce8a4, type: 2}
 --- !u!114 &2140444732
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -784,6 +818,4 @@ SceneRoots:
   m_Roots:
   - {fileID: 2140444733}
   - {fileID: 643343495}
-  - {fileID: 479738324}
-  - {fileID: 1921602201}
-  - {fileID: 883870322}
+  - {fileID: 385149511}
