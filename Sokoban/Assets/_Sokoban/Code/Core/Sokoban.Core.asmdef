@@ -1,0 +1,8 @@
+{
+    "name": "Sokoban.Core",
+    "rootNamespace": "Sokoban.Core",
+    "references": [],
+    "overrideReferences": true,
+    "precompiledReferences": ["DefaultEcs.dll"],
+    "noEngineReferences": true
+}

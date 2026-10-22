@@ -1,0 +1,19 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 0ea6ff1de344a44469a3439f735a43ea, type: 3}
+  m_Name: LevelViewCatalog
+  m_EditorClassIdentifier: 
+  _floorPrefab: {fileID: 7864807308412324709, guid: 17f9d416439a491429a2372dbde41111, type: 3}
+  _wallPrefab: {fileID: 3019956986492254366, guid: 5d3fc6bac24fa1948a977bfa42658e50, type: 3}
+  _boxPrefab: {fileID: 1464484887366625871, guid: 973e30aed52df874a8a9b583c4cf06d6, type: 3}
+  _goalMaterial: {fileID: 2100000, guid: efe26027cacc84b409062a6cff9b90c4, type: 2}
+  _playerMaterial: {fileID: 2100000, guid: 5a7ca585a9b2b3c4587125916713263d, type: 2}

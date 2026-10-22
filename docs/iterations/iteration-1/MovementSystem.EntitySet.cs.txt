@@ -1,0 +1,126 @@
+using System;
+using DefaultEcs;
+using Sokoban.Domain.Commands;
+using Sokoban.Domain.Components;
+
+namespace Sokoban.Domain.Systems
+{
+    public sealed class MovementSystem : IDisposable
+    {
+        private readonly EntitySet _players;
+        private readonly EntitySet _boxes;
+        private readonly EntitySet _walls;
+
+        private bool _disposed;
+
+        public MovementSystem(World world)
+        {
+            if (world == null)
+            {
+                throw new ArgumentNullException(nameof(world));
+            }
+
+            _players = world.GetEntities().With<GridPosition>().With<PlayerTag>().AsSet();
+            _boxes = world.GetEntities().With<GridPosition>().With<BoxTag>().AsSet();
+            _walls = world.GetEntities().With<GridPosition>().With<WallTag>().AsSet();
+        }
+
+        public bool TryMove(MoveCommand command)
+        {
+            if (_disposed)
+            {
+                throw new ObjectDisposedException(nameof(MovementSystem));
+            }
+
+            if (_players.Count != 1)
+            {
+                return false;
+            }
+
+            int deltaX = 0;
+            int deltaY = 0;
+            
+            switch (command)
+            {
+                case MoveCommand.Up:
+                    deltaY = 1;
+                    break;
+                case MoveCommand.Down:
+                    deltaY = -1;
+                    break;
+                case MoveCommand.Left:
+                    deltaX = -1;
+                    break;
+                case MoveCommand.Right:
+                    deltaX = 1;
+                    break;
+                default:
+                    return false;
+            }
+
+            Entity player = _players.GetEntities()[0];
+            GridPosition playerPosition = player.Get<GridPosition>();
+            if (!TryOffset(playerPosition, deltaX, deltaY, out GridPosition destination) || TryGetEntityAt(_walls, destination, out _))
+            {
+                return false;
+            }
+
+            if (TryGetEntityAt(_boxes, destination, out Entity box))
+            {
+                if (!TryOffset(destination, deltaX, deltaY, out GridPosition boxDestination)
+                    || TryGetEntityAt(_walls, boxDestination, out _)
+                    || TryGetEntityAt(_boxes, boxDestination, out _))
+                {
+                    return false;
+                }
+
+                box.Set(boxDestination);
+            }
+
+            player.Set(destination);
+            return true;
+        }
+
+        public void Dispose()
+        {
+            if (_disposed)
+            {
+                return;
+            }
+
+            _disposed = true;
+            _players.Dispose();
+            _boxes.Dispose();
+            _walls.Dispose();
+        }
+
+        private static bool TryGetEntityAt(EntitySet entities, GridPosition position, out Entity entity)
+        {
+            foreach (Entity candidate in entities.GetEntities())
+            {
+                if (candidate.Get<GridPosition>() == position)
+                {
+                    entity = candidate;
+                    return true;
+                }
+            }
+
+            entity = default;
+            return false;
+        }
+
+        private static bool TryOffset(GridPosition position, int deltaX, int deltaY, out GridPosition result)
+        {
+            long x = (long)position.X + deltaX;
+            long y = (long)position.Y + deltaY;
+            if (x < int.MinValue || x > int.MaxValue || y < int.MinValue || y > int.MaxValue)
+            {
+                result = default;
+                return false;
+            }
+
+            result = new GridPosition((int)x, (int)y);
+            return true;
+        }
+    }
+}

@@ -1,0 +1,19 @@
+{
+    "name": "Sokoban.PlayModeTests",
+    "rootNamespace": "Sokoban.Tests.PlayMode",
+    "references": [
+        "Sokoban.Unity",
+        "Sokoban.Core",
+        "Unity.InputSystem",
+        "Zenject"
+    ],
+    "overrideReferences": true,
+    "precompiledReferences": [
+        "DefaultEcs.dll",
+        "nunit.framework.dll",
+        "Zenject-usage.dll"
+    ],
+    "optionalUnityReferences": [
+        "TestAssemblies"
+    ]
+}

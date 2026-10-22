@@ -1,0 +1,19 @@
+{
+    "name": "Sokoban.Unity",
+    "rootNamespace": "Sokoban.Unity",
+    "references": [
+        "Sokoban.Core",
+
+        "Unity.InputSystem",
+        "Zenject"
+    ],
+    "includePlatforms": [],
+    "excludePlatforms": [],
+    "allowUnsafeCode": false,
+    "overrideReferences": false,
+    "precompiledReferences": [],
+    "autoReferenced": true,
+    "defineConstraints": [],
+    "versionDefines": [],
+    "noEngineReferences": false
+}
