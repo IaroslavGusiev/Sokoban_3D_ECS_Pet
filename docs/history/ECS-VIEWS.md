@@ -1,6 +1,8 @@
 # ECS-driven asynchronous views
 
-This records the preceding migration. The current startup gate and failed-cache retry behavior supersede the immediate-Playing and retained-failure policy below; see [STARTUP-GATE.md](STARTUP-GATE.md) and [ARCHITECTURE.md](ARCHITECTURE.md).
+**Historical record.** Behavior, setup steps, pass counts, and pending proposals below belong to the recorded milestone. Use [current architecture](../ARCHITECTURE.md) and [current setup](../SETUP.md) for the implemented project.
+
+This records the preceding migration. The current startup gate and failed-cache retry behavior supersede the immediate-Playing and retained-failure policy below; see [STARTUP-GATE.md](STARTUP-GATE.md) and [ARCHITECTURE.md](../ARCHITECTURE.md).
 
 Implemented and verified on 2026-10-22. No commits were made, following the explicit clarification. The existing UniTask installation and Addressables exit-handle fix were retained. Shared prefab-load failures log once per cached kind, following the explicit logging clarification.
 
@@ -98,7 +100,7 @@ TransformAdapter still sets TransformComponent. This is redundant and harmless: 
 
 ## Assembly and friendship audit
 
-The full list of all 20 source/vendored asmdefs and the resolved-package snapshot remains in [ASSEMBLIES.md](ASSEMBLIES.md). No assembly or asmdef was renamed.
+The full list of all 20 source/vendored asmdefs and the resolved-package snapshot remains in [ASSEMBLIES.md](../ASSEMBLIES.md). No assembly or asmdef was renamed.
 
 | Core friend | Outcome | Evidence |
 | --- | --- | --- |

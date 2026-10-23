@@ -1,5 +1,7 @@
 # String Addressables addresses
 
+**Historical record.** Behavior, setup steps, pass counts, and pending proposals below belong to the recorded milestone. Use [current architecture](../ARCHITECTURE.md) and [current setup](../SETUP.md) for the implemented project.
+
 Implemented on 2026-10-23. All work remains uncommitted.
 
 ViewCatalog.SkinEntry now stores Skin and string Address. KindEntry still groups skins by ViewKind. LevelList stores an ordered string array. ViewAssets loads GameObject by the resolved entry's Address; AddressableLevelSource loads TextAsset by the indexed level address. No address wrapper, generic loader, or legacy compatibility fields were added.

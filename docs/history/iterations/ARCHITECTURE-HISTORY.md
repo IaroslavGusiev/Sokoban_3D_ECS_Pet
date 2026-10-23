@@ -1,6 +1,8 @@
 # Architecture history
 
-Historical snapshot before the readability refactor on 2026-10-21. Statements about "current" or "active" implementations below refer to that snapshot. See [the current architecture](../ARCHITECTURE.md) for the implemented design and names.
+**Historical record.** Behavior, setup steps, pass counts, and pending proposals below belong to the recorded milestone. Use [current architecture](../../ARCHITECTURE.md) and [current setup](../../SETUP.md) for the implemented project.
+
+Historical snapshot before the readability refactor on 2026-10-21. Statements about "current" or "active" implementations below refer to that snapshot. See [the current architecture](../../ARCHITECTURE.md) for the implemented design and names.
 
 # Sokoban Architecture — Working Design
 

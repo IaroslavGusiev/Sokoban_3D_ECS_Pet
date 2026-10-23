@@ -1,5 +1,7 @@
 # Grouped ViewCatalog
 
+**Historical record.** Behavior, setup steps, pass counts, and pending proposals below belong to the recorded milestone. Use [current architecture](../ARCHITECTURE.md) and [current setup](../SETUP.md) for the implemented project.
+
 This report records the preceding grouping change. [STRING-ADDRESSES.md](STRING-ADDRESSES.md) describes the current string fields and migration that supersede the AssetReference representation below.
 
 Implemented and verified on 2026-10-23, uncommitted.

@@ -1,5 +1,7 @@
 # Assembly definition inventory
 
+Reference inventory; use [architecture](ARCHITECTURE.md) for current boundaries and [setup](SETUP.md) for verification steps. Inventory dates below describe snapshots, not a fresh compile/test result.
+
 Source inventory updated on 2026-10-23 for string-address validation; the resolved-package inventory remains the 2026-10-22 snapshot. Assembly names are read from the JSON name field, not inferred from filenames. Library entries are generated package-cache inputs, listed separately from source/vendored files.
 
 Friendship audit after ECS-driven view binding: Core keeps Sokoban.EditModeTests (internal movement systems) and Sokoban.App.EditModeTests (internal Simulation constructor and MovementFeature). Sokoban.PlayModeTests exists but no longer uses Core internals, so its friend entry was removed. No nonexistent friend entries were present. String-address migration adds Sokoban.Editor and Sokoban.Editor.Tests, both Editor-only; existing assemblies and Core friendship are unchanged.

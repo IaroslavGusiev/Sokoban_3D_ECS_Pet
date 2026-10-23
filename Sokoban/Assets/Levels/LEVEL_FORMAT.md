@@ -20,6 +20,7 @@ The first line is the top of the board. For zero-based `lineIndex` and `columnIn
 - Include exactly one player: count `@` and `+` together.
 - Include at least one box: count `$` and `*` together.
 - Match the total number of boxes to goals. Goals are `.`, `*`, and `+`.
+- Leave at least one box off its goal; an already solved starting layout is rejected.
 - Use only the seven characters above. A space is invalid, including leading/trailing spaces. Rows are not trimmed.
 - Do not put empty lines inside the level. Trailing empty lines are ignored. Both LF and CRLF line endings are accepted.
 - Enclose the player-reachable non-wall area. Flood fill treats floors, goals, and boxes as passable. If it reaches any grid edge, parsing fails with `level: the playable area touches the grid edge; close it with walls (#) so the player and boxes cannot leave.` Unreachable edge cells do not count as openings.
@@ -43,7 +44,7 @@ All cells imply floor; there is no separate floor list. The parser validates sha
 1. Create `Assets/Levels/level-NN.txt` using the format above. Prefer a small enclosed board (about 6x6 to 8x8) with 2–3 boxes and a short solution.
 2. Ensure each box can reach a goal. A box in a non-goal corner cannot be recovered; adjacent boxes and narrow corridors can also block pushes.
 3. Run the tests below. The file-based TestCaseSource automatically discovers every `Assets/Levels/*.txt`; no test case registration is required.
-4. In Unity, mark the text file Addressable (for example, `levels/level-04`) and add its TextAsset reference to the ordered LevelList asset. The controller starts at index 0. N is a temporary developer shortcut for cycling levels; no win detection or completion-driven progression is implemented.
+4. In Unity, mark the text file Addressable (for example, `levels/level-04`) and add that exact string address to the ordered LevelList asset. The controller starts at index 0, detects completion, and advances after 0.75 game seconds. N is a temporary Editor/development shortcut for cycling levels. Follow the [current setup guide](../../../docs/SETUP.md) to validate addresses and rebuild content.
 
 ## Running tests
 

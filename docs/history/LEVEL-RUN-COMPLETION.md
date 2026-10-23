@@ -1,5 +1,7 @@
 # LevelRun and completion flow
 
+**Historical record.** Behavior, setup steps, pass counts, and pending proposals below belong to the recorded milestone. Use [current architecture](../ARCHITECTURE.md) and [current setup](../SETUP.md) for the implemented project.
+
 Implemented and verified on 2026-10-23. Work remains uncommitted, following the user's clarification. This manifest describes changes made during this task, separate from the substantial pre-existing working-tree changes.
 
 ## Behavior

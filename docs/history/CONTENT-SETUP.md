@@ -1,5 +1,7 @@
 # Previous synchronous content setup
 
+**Historical record.** Behavior, setup steps, pass counts, and pending proposals below belong to the recorded milestone. Use [current architecture](../ARCHITECTURE.md) and [current setup](../SETUP.md) for the implemented project.
+
 These instructions describe the preceding synchronous stage. The Addressables migration supersedes its catalog/list field types and loading behavior. Use [ASYNC-CONTENT.md](ASYNC-CONTENT.md) for current setup, ownership, diagnostics, and verification. The prefab-variant authoring details below still apply.
 
 The synchronous content refactor is implemented in C#. Scene, prefab, and ScriptableObject asset files were intentionally left for manual editor setup. Unity generated metadata for new code/text files; the removed hardcoded scripts and their metadata were deleted through AssetDatabase.
@@ -48,7 +50,7 @@ GameplayController loads index 0 exactly once in Initialize. R disposes the run 
 
 Before manual setup, all 152 EditMode cases and the 14 standalone PresentationPipelineTests passed. The temporary direct comparison with HardcodedLevel.Create passed before that class was deleted. The ten saved-scene cases remain pending the manual setup above; their previous pass results do not validate this new scene configuration.
 
-See [LEVEL_FORMAT.md](../Sokoban/Assets/Levels/LEVEL_FORMAT.md) for the exact parser contract and instructions for adding automatically tested levels. Shortest solutions for the supplied levels are 6, 12, and 11 moves respectively.
+See [LEVEL_FORMAT.md](../../Sokoban/Assets/Levels/LEVEL_FORMAT.md) for the exact parser contract and instructions for adding automatically tested levels. Shortest solutions for the supplied levels are 6, 12, and 11 moves respectively.
 
 ## Adapter finding and pending proposal
 

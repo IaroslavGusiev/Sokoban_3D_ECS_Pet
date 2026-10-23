@@ -1,5 +1,7 @@
 # Async view tests and runtime skins
 
+**Historical record.** Behavior, setup steps, pass counts, and pending proposals below belong to the recorded milestone. Use [current architecture](../ARCHITECTURE.md) and [current setup](../SETUP.md) for the implemented project.
+
 Implemented and verified on 2026-10-23. The user clarified that this task should remain uncommitted. Existing uncommitted work was preserved; the manifest below lists this task's changes rather than the full working tree.
 
 ## Implemented behavior

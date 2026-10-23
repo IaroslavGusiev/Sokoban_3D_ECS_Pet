@@ -1,5 +1,7 @@
 # Query-based startup view gate
 
+**Historical record.** Behavior, setup steps, pass counts, and pending proposals below belong to the recorded milestone. Use [current architecture](../ARCHITECTURE.md) and [current setup](../SETUP.md) for the implemented project.
+
 Implemented on 2026-10-22, uncommitted. This supersedes the immediate-Playing and permanently cached-failure behavior in ECS-VIEWS.md.
 
 ViewQuery.Viewable defines GridPosition plus Wall/Box/Player/Goal/Floor tag eligibility once. ViewBindingSystem reuses it and adds its pending/failed/bound exclusions. ViewLayer owns and disposes two live EntitySets: eligible entities without TransformComponent, and all entities with ViewFailed. Status gives Failed priority, then Binding, then Ready. No readiness system, marker, asynchronous readiness API, or readiness token was introduced.

@@ -1,5 +1,7 @@
 # View failure recovery and Tick cleanup
 
+**Historical record.** Behavior, setup steps, pass counts, and pending proposals below belong to the recorded milestone. Use [current architecture](../ARCHITECTURE.md) and [current setup](../SETUP.md) for the implemented project.
+
 Implemented and verified on 2026-10-23, including the approved live-skin failure policy. The user requested that this task remain uncommitted. Existing unrelated working-tree changes were preserved.
 
 ## Approved live-skin failure policy
