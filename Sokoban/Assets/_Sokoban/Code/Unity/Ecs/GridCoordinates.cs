@@ -1,7 +1,7 @@
 using UnityEngine;
 using Sokoban.Core.Components;
 
-namespace Sokoban.Unity.Ecs
+namespace Sokoban.Presentation.Ecs
 {
     public static class GridCoordinates
     {

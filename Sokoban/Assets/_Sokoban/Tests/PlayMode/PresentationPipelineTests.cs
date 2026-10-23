@@ -3,15 +3,21 @@ using System;
 using System.Collections;
 using System.Collections.Generic;
 using System.Linq;
+using System.IO;
+using System.Threading;
+using Cysharp.Threading.Tasks;
+using UnityEngine.AddressableAssets;
+using UnityEngine.ResourceManagement.AsyncOperations;
+using System.Text.RegularExpressions;
 using DefaultEcs;
 using NUnit.Framework;
 using Sokoban.Core.Commands;
 using Sokoban.Core.Components;
-using Sokoban.Unity;
-using Sokoban.Unity.Ecs.Adapters;
-using Sokoban.Unity.Ecs.Components;
-using Sokoban.Unity.Ecs.Systems;
-using Sokoban.Unity.Ecs.Model;
+using Sokoban.Presentation;
+using Sokoban.Presentation.Ecs.Adapters;
+using Sokoban.Presentation.Ecs.Components;
+using Sokoban.Presentation.Ecs.Systems;
+using Sokoban.Presentation.Ecs.Model;
 using System.Reflection;
 using UnityEngine;
 using UnityEngine.InputSystem;
@@ -42,7 +48,7 @@ namespace Sokoban.Tests.PlayMode
         [UnityTest]
         public IEnumerator BindingAndSync_ProjectIntoWorldSpaceUnderTranslatedAndRotatedParent()
         {
-            var simulation = Track(CreateSimulation(HardcodedLevel.Create()));
+            var simulation = Track(CreateSimulation(CreateLevel()));
             World world = simulation.World;
             using var sync = new GridTransformSyncSystem(world);
             Entity player = Player(simulation);
@@ -71,20 +77,20 @@ namespace Sokoban.Tests.PlayMode
             AssertPosition(actor.transform, new Vector3(5, 0, 5));
             actor.SetActive(true);
             Assert.That(player.Get<TransformComponent>().Transform, Is.SameAs(actor.transform));
-            Assert.That(simulation.World.Count(), Is.EqualTo(29));
+            Assert.That(simulation.World.Count(), Is.EqualTo(76));
             yield return null;
         }
 
         [UnityTest]
-        public IEnumerator DuplicateBinding_IsRejectedWithoutReplacingTheOriginal()
+        public IEnumerator AdapterInstallation_ReplacesTheExistingValueWithSet()
         {
-            var simulation = Track(CreateSimulation(HardcodedLevel.Create()));
+            var simulation = Track(CreateSimulation(CreateLevel()));
             Entity player = Player(simulation);
             var first = CreateAdapter(CreateObject("First"));
             var second = CreateAdapter(CreateObject("Second"));
             first.Install(player);
-            Assert.Throws<InvalidOperationException>(() => second.Install(player));
-            Assert.That(player.Get<TransformComponent>().Transform, Is.SameAs(first.transform));
+            second.Install(player);
+            Assert.That(player.Get<TransformComponent>().Transform, Is.SameAs(second.transform));
             Assert.That(player.IsAlive, Is.True);
             yield return null;
         }
@@ -92,13 +98,13 @@ namespace Sokoban.Tests.PlayMode
         [UnityTest]
         public IEnumerator DestroyingOldViews_CannotAffectReplacementSimulationBinding()
         {
-            var previous = Track(CreateSimulation(HardcodedLevel.Create()));
+            var previous = Track(CreateSimulation(CreateLevel()));
             var oldAdapter = CreateAdapter(CreateObject("Old view"));
             oldAdapter.Install(Player(previous));
             previous.Dispose();
             _simulations.Remove(previous);
 
-            var replacement = Track(CreateSimulation(HardcodedLevel.Create()));
+            var replacement = Track(CreateSimulation(CreateLevel()));
             Entity player = Player(replacement);
             var currentAdapter = CreateAdapter(CreateObject("Current view"));
             currentAdapter.Install(player);
@@ -138,34 +144,38 @@ namespace Sokoban.Tests.PlayMode
         public IEnumerator Controller_AppliesRestartAfterMovementAndReleasesCurrentLevel()
         {
             var trace = new List<string>();
-            var catalog = UnityEditor.AssetDatabase.LoadAssetAtPath<ViewCatalog>("Assets/_Sokoban/Scenes/LevelViewCatalog.asset");
+            var content = CreateLevel();
+            var source = new TestLevelSource(content);
             var input = new TestInput();
-            var controller = new GameplayController(input, new HardcodedLevelProvider(),
-                new ViewFeatures(), catalog, new LevelRoot(CreateObject("Level root").transform));
+            var controller = new GameplayController(input, source,
+                new ViewFeatures(), new LevelRoot(CreateObject("Level root").transform), CreateViewProvider());
             try
             {
                 controller.Initialize();
-                Simulation simulation = controller.Current;
+                Simulation simulation = SimulationOf(controller);
                 World world = simulation.World;
                 using var movement = world.SubscribeComponentChanged<GridPosition>(
                     (in Entity entity, in GridPosition oldValue, in GridPosition newValue) =>
                     {
                         trace.Add("movement");
                         input.RestartPressed = true;
-                        Assert.That(controller.Current, Is.SameAs(simulation));
+                        Assert.That(SimulationOf(controller), Is.SameAs(simulation));
                     });
                 using var disposed = world.SubscribeWorldDisposed(_ => trace.Add("disposed"));
                 simulation.Send(MoveCommand.Left);
                 controller.Tick();
                 Assert.That(trace, Is.EqualTo(new[] { "movement", "disposed" }));
-                Assert.That(controller.Current, Is.Not.SameAs(simulation));
+                Assert.That(SimulationOf(controller), Is.Not.SameAs(simulation));
+                Assert.That(source.LoadCalls, Is.EqualTo(1), "Restart reuses content instead of loading again.");
+                Assert.That(SimulationOf(controller).World.Single(entity => entity.Has<PlayerTag>()).Get<GridPosition>(),
+                    Is.EqualTo(content.PlayerStart));
                 Assert.That(trace.Count, Is.EqualTo(2));
             }
             finally
             {
                 controller.Dispose();
             }
-            Assert.That(controller.Current, Is.Null);
+            Assert.That(SimulationOf(controller), Is.Null);
             yield return null;
         }
 #endif
@@ -173,13 +183,12 @@ namespace Sokoban.Tests.PlayMode
         [UnityTest]
         public IEnumerator ViewInstallationFailure_LeavesCleanupToTheSimulation()
         {
-            var simulation = Track(CreateSimulation(HardcodedLevel.Create()));
+            var simulation = Track(CreateSimulation(CreateLevel()));
             Entity player = Player(simulation);
             GameObject host = CreateObject("Entity view");
             var view = host.AddComponent<EntityView>();
             var first = CreateAdapter(host);
-            var duplicate = CreateAdapter(CreateObject("Duplicate"));
-            SetField(view, "_adapters", new EntityAdapter[] { first, duplicate });
+            SetField(view, "_adapters", new EntityAdapter[] { first, null });
 
             Assert.Throws<InvalidOperationException>(() => view.Install(player));
             Assert.That(player.Get<TransformComponent>().Transform, Is.SameAs(host.transform));
@@ -187,7 +196,7 @@ namespace Sokoban.Tests.PlayMode
 
             simulation.Dispose();
             _simulations.Remove(simulation);
-            var replacement = Track(CreateSimulation(HardcodedLevel.Create()));
+            var replacement = Track(CreateSimulation(CreateLevel()));
             Assert.That(Player(replacement).Has<TransformComponent>(), Is.False);
             yield return null;
         }
@@ -195,7 +204,7 @@ namespace Sokoban.Tests.PlayMode
         [UnityTest]
         public IEnumerator MissingTransform_IsSkippedByProjection()
         {
-            var simulation = Track(CreateSimulation(HardcodedLevel.Create()));
+            var simulation = Track(CreateSimulation(CreateLevel()));
             World world = simulation.World;
             using var sync = new GridTransformSyncSystem(world);
             Entity player = Player(simulation);
@@ -211,7 +220,7 @@ namespace Sokoban.Tests.PlayMode
         [UnityTest]
         public IEnumerator EntityView_InstallsComponentsWithoutCreatingEntities()
         {
-            var simulation = Track(CreateSimulation(HardcodedLevel.Create()));
+            var simulation = Track(CreateSimulation(CreateLevel()));
             Entity player = Player(simulation);
             GameObject host = CreateObject("Actor");
             var adapter = CreateAdapter(host);
@@ -220,15 +229,15 @@ namespace Sokoban.Tests.PlayMode
 
             view.Install(player);
             Assert.That(player.Get<TransformComponent>().Transform, Is.SameAs(adapter.transform));
-            Assert.That(simulation.World.Count(), Is.EqualTo(29));
-            Assert.Throws<InvalidOperationException>(() => view.Install(player));
+            Assert.That(simulation.World.Count(), Is.EqualTo(76));
+            Assert.DoesNotThrow(() => view.Install(player));
             yield return null;
         }
 
         [UnityTest]
         public IEnumerator EntityDisposal_RemovesGameplayAndAdapterComponentsFromQueries()
         {
-            var simulation = Track(CreateSimulation(HardcodedLevel.Create()));
+            var simulation = Track(CreateSimulation(CreateLevel()));
             Entity player = Player(simulation);
             var adapter = CreateAdapter(CreateObject("Actor"));
             adapter.Install(player);
@@ -237,20 +246,20 @@ namespace Sokoban.Tests.PlayMode
             using var positions = player.World.GetEntities().With<GridPosition>().AsSet();
             Assert.That(transforms.Count, Is.EqualTo(1));
             Assert.That(players.Count, Is.EqualTo(1));
-            Assert.That(positions.Count, Is.EqualTo(29));
+            Assert.That(positions.Count, Is.EqualTo(76));
 
             player.Dispose();
 
             Assert.That(transforms.Count, Is.Zero);
             Assert.That(players.Count, Is.Zero);
-            Assert.That(positions.Count, Is.EqualTo(28));
+            Assert.That(positions.Count, Is.EqualTo(75));
             yield return null;
         }
 
         [UnityTest]
         public IEnumerator DestroyingAView_DoesNotDisposeItsGameplayEntity()
         {
-            var simulation = Track(CreateSimulation(HardcodedLevel.Create()));
+            var simulation = Track(CreateSimulation(CreateLevel()));
             World world = simulation.World;
             using var sync = new GridTransformSyncSystem(world);
             Entity player = Player(simulation);
@@ -269,7 +278,7 @@ namespace Sokoban.Tests.PlayMode
         [UnityTest]
         public IEnumerator TransformProjection_UpdatesWorldPositionWithoutWritingEcsComponents()
         {
-            var simulation = Track(CreateSimulation(HardcodedLevel.Create()));
+            var simulation = Track(CreateSimulation(CreateLevel()));
             World world = simulation.World;
             using var sync = new GridTransformSyncSystem(world);
             Entity player = Player(simulation);
@@ -336,9 +345,205 @@ namespace Sokoban.Tests.PlayMode
         }
 
         [UnityTest]
+        public IEnumerator Loading_PausesOldRunThenReplacesDefinition()
+        {
+            var first = CreateLevel();
+            var second = CreateLevel();
+
+
+            var pending = new UniTaskCompletionSource<LevelDefinition>();
+            var source = new TestLevelSource((index, _) => index == 0 ? UniTask.FromResult(first) : pending.Task) { Count = 2 };
+            var input = new TestInput();
+            var controller = new GameplayController(input, source, new ViewFeatures(), new LevelRoot(CreateObject("Async root").transform), CreateViewProvider());
+            try
+            {
+                controller.Initialize();
+                controller.Tick();
+                Simulation old = SimulationOf(controller);
+                input.Move = MoveCommand.Left;
+                input.NextLevelPressed = true;
+                controller.Tick();
+                Assert.That(Player(old).Get<GridPosition>(), Is.EqualTo(new GridPosition(2, 2)));
+                Assert.That(SimulationOf(controller), Is.SameAs(old));
+
+
+                input.NextLevelPressed = false;
+                input.Move = MoveCommand.Right;
+                old.Send(MoveCommand.Up);
+                controller.Tick();
+                Assert.That(Player(old).Get<GridPosition>(), Is.EqualTo(new GridPosition(2, 2)));
+                Assert.That(Player(old).Has<MoveRequest>(), Is.True);
+                Assert.That(source.Requested, Is.EqualTo(new[] { 0, 1 }));
+
+                pending.TrySetResult(second);
+                yield return null;
+                Assert.That(SimulationOf(controller), Is.Not.SameAs(old));
+
+
+                Assert.That(Player(SimulationOf(controller)).Get<GridPosition>(), Is.EqualTo(second.PlayerStart));
+
+                input.RestartPressed = true;
+                controller.Tick();
+                Assert.That(source.LoadCalls, Is.EqualTo(2));
+
+                Assert.That(Player(SimulationOf(controller)).Get<GridPosition>(), Is.EqualTo(second.PlayerStart));
+            }
+            finally
+            {
+                controller.Dispose();
+            }
+
+        }
+
+        [UnityTest]
+        public IEnumerator DisposeDuringInitialLoad_IgnoresLateDefinitionWithoutCreatingARun()
+        {
+            var content = CreateLevel();
+
+            var pending = new UniTaskCompletionSource<LevelDefinition>();
+            var source = new TestLevelSource((_, _) => pending.Task);
+            var controller = new GameplayController(new TestInput(), source, new ViewFeatures(), new LevelRoot(CreateObject("Cancelled root").transform), CreateViewProvider());
+            controller.Initialize();
+            controller.Tick();
+            controller.Dispose();
+            Assert.That(source.LastToken.IsCancellationRequested, Is.True);
+            pending.TrySetResult(content);
+            yield return null;
+            Assert.That(SimulationOf(controller), Is.Null);
+
+        }
+
+        [UnityTest]
+        public IEnumerator LoadFailure_LogsOnceAndBlocksInputOnThePreviousRun()
+        {
+            var content = CreateLevel();
+
+            var source = new TestLevelSource((index, _) => index == 0
+                ? UniTask.FromResult(content)
+                : UniTask.FromException<LevelDefinition>(new InvalidOperationException("planned load failure"))) { Count = 2 };
+            var input = new TestInput();
+            var controller = new GameplayController(input, source, new ViewFeatures(), new LevelRoot(CreateObject("Failure root").transform), CreateViewProvider());
+            try
+            {
+                controller.Initialize();
+                controller.Tick();
+                Simulation old = SimulationOf(controller);
+                LogAssert.Expect(LogType.Exception, new Regex("InvalidOperationException: planned load failure"));
+                input.NextLevelPressed = true;
+                controller.Tick();
+                input.NextLevelPressed = false;
+                input.Move = MoveCommand.Left;
+                controller.Tick();
+                Assert.That(SimulationOf(controller), Is.SameAs(old));
+                Assert.That(Player(old).Get<GridPosition>(), Is.EqualTo(content.PlayerStart));
+
+                Assert.That(source.LoadCalls, Is.EqualTo(2));
+                Assert.That(typeof(GameplayController).GetField("_state", BindingFlags.Instance | BindingFlags.NonPublic)
+                    .GetValue(controller).ToString(), Is.EqualTo("LevelFailed"));
+                LogAssert.Expect(LogType.Exception, new Regex("InvalidOperationException: planned load failure"));
+                input.RestartPressed = true;
+                controller.Tick();
+                input.RestartPressed = false;
+                Assert.That(source.Requested, Is.EqualTo(new[] { 0, 1, 1 }));
+                Assert.That(SimulationOf(controller), Is.SameAs(old));
+                LogAssert.NoUnexpectedReceived();
+                yield return null;
+            }
+            finally
+            {
+                controller.Dispose();
+            }
+
+        }
+
+        [Test]
+        public void DisposeBeforeInitialize_DoesNotNeedLoadedContent()
+        {
+            var source = new TestLevelSource((_, _) => throw new InvalidOperationException("No load should start."));
+            var controller = new GameplayController(new TestInput(), source, new ViewFeatures(), new LevelRoot(CreateObject("Unused root").transform), CreateViewProvider());
+            Assert.DoesNotThrow(controller.Dispose);
+            Assert.That(source.LoadCalls, Is.Zero);
+            Assert.That(SimulationOf(controller), Is.Null);
+        }
+
+        [Test]
+        public void ReleasingPendingHandle_DestroysOperationWhenItCompletes()
+        {
+            var operation = new PendingOperation();
+            AsyncOperationHandle<GameObject> handle = Addressables.ResourceManager.StartOperation(operation, default);
+            Assert.That(handle.IsDone, Is.False);
+            Addressables.Release(handle);
+            Assert.That(operation.DestroyCalls, Is.Zero);
+            operation.Finish(CreateObject("Pending result"));
+            Assert.That(operation.DestroyCalls, Is.EqualTo(1));
+            Assert.That(handle.IsValid(), Is.False);
+        }
+
+        [Test]
+        public void AuthoringValidation_ReportsMissingDuplicateAndEmptyAddresses()
+        {
+            var catalog = ScriptableObject.CreateInstance<ViewCatalog>();
+            var levels = ScriptableObject.CreateInstance<LevelList>();
+            try
+            {
+                SetField(catalog, "entries", new[]
+                {
+                    new ViewCatalog.KindEntry { Kind = ViewKind.Floor, Skins = new[]
+                    {
+                        new ViewCatalog.SkinEntry { Skin = SkinId.Default, Address = Guid.NewGuid().ToString("N") }
+                    } },
+                    new ViewCatalog.KindEntry { Kind = ViewKind.Floor, Skins = new[]
+                    {
+                        new ViewCatalog.SkinEntry { Skin = SkinId.Default, Address = Guid.NewGuid().ToString("N") }
+                    } },
+                    new ViewCatalog.KindEntry { Kind = ViewKind.Wall, Skins = new[]
+                    {
+                        new ViewCatalog.SkinEntry { Skin = SkinId.Default, Address = " " }
+                    } }
+                });
+                string message = Assert.Throws<InvalidOperationException>(catalog.Validate).Message;
+                Assert.That(message, Does.Contain("Floor: duplicated"));
+                Assert.That(message, Does.Contain("Wall: empty address"));
+                Assert.That(message, Does.Contain("Box: missing"));
+                Assert.That(message, Does.Contain("Player: missing"));
+                Assert.That(message, Does.Contain("Goal: missing"));
+                Assert.Throws<InvalidOperationException>(levels.Validate);
+                SetField(levels, "levels", new string[] { " ", null, "" });
+                Assert.That(levels.Count, Is.EqualTo(3));
+                Assert.That(Assert.Throws<InvalidOperationException>(levels.Validate).Message, Does.Contain("0, 1, 2"));
+            }
+            finally
+            {
+                UnityEngine.Object.DestroyImmediate(catalog);
+                UnityEngine.Object.DestroyImmediate(levels);
+            }
+        }
+
+        [Test]
+        public void LevelAddresses_RoundTripWithoutChangingOrder()
+        {
+            var levels = ScriptableObject.CreateInstance<LevelList>();
+            var restored = ScriptableObject.CreateInstance<LevelList>();
+            try
+            {
+                var addresses = new[] { "levels/level-03", "levels/level-01", "levels/level-02" };
+                SetField(levels, "levels", addresses);
+                JsonUtility.FromJsonOverwrite(JsonUtility.ToJson(levels), restored);
+                Assert.DoesNotThrow(restored.Validate);
+                Assert.That(restored.Levels, Is.EqualTo(addresses));
+                Assert.That(restored.Count, Is.EqualTo(3));
+            }
+            finally
+            {
+                UnityEngine.Object.DestroyImmediate(levels);
+                UnityEngine.Object.DestroyImmediate(restored);
+            }
+        }
+
+        [UnityTest]
         public IEnumerator DirectionalInput_UsesPriorityAndQueuesMovementWithoutExecutingIt()
         {
-            var simulation = Track(CreateSimulation(HardcodedLevel.Create()));
+            var simulation = Track(CreateSimulation(CreateLevel()));
             Entity player = Player(simulation);
             World world = player.World;
             Entity wall = world.CreateEntity();
@@ -358,14 +563,16 @@ namespace Sokoban.Tests.PlayMode
         [UnityTest]
         public IEnumerator RestartInput_IsReadWithoutMutatingSimulationRequests()
         {
-            var simulation = Track(CreateSimulation(HardcodedLevel.Create()));
+            var simulation = Track(CreateSimulation(CreateLevel()));
             Entity player = Player(simulation);
             var input = new KeyboardMoveInput();
             simulation.Send(MoveCommand.Left);
             yield return WithKeyboard(keyboard =>
             {
-                PressKeys(keyboard, Key.R, Key.RightArrow);
+                PressKeys(keyboard, Key.R, Key.N, Key.K, Key.RightArrow);
                 Assert.That(input.RestartPressed, Is.True);
+                Assert.That(input.NextLevelPressed, Is.True);
+                Assert.That(input.NextSkinPressed, Is.True);
                 Assert.That(input.ReadMove(), Is.EqualTo(MoveCommand.Right));
                 Assert.That(player.Get<MoveRequest>().Command, Is.EqualTo(MoveCommand.Left));
                 Assert.That(player.Get<GridPosition>(), Is.EqualTo(new GridPosition(3, 2)));
@@ -384,11 +591,14 @@ namespace Sokoban.Tests.PlayMode
         {
             var previousEditorInput = InputSystem.settings.editorInputBehaviorInPlayMode;
             var previousBackgroundInput = InputSystem.settings.backgroundBehavior;
+            bool previousRunInBackground = InputSystem.runInBackground;
             Keyboard keyboard = InputSystem.AddDevice<Keyboard>();
             try
             {
+                InputSystem.runInBackground = true;
                 InputSystem.settings.editorInputBehaviorInPlayMode = InputSettings.EditorInputBehaviorInPlayMode.AllDeviceInputAlwaysGoesToGameView;
                 InputSystem.settings.backgroundBehavior = InputSettings.BackgroundBehavior.IgnoreFocus;
+                InputSystem.EnableDevice(keyboard);
                 check(keyboard);
                 yield return null;
             }
@@ -397,6 +607,7 @@ namespace Sokoban.Tests.PlayMode
                 if (keyboard.added) InputSystem.RemoveDevice(keyboard);
                 InputSystem.settings.editorInputBehaviorInPlayMode = previousEditorInput;
                 InputSystem.settings.backgroundBehavior = previousBackgroundInput;
+                InputSystem.runInBackground = previousRunInBackground;
             }
         }
 
@@ -429,10 +640,80 @@ namespace Sokoban.Tests.PlayMode
         private static Entity Player(Simulation simulation) => simulation.World.Single(entity => entity.Has<PlayerTag>());
         private static Entity Player(World world) => world.Single(entity => entity.Has<PlayerTag>());
 
+        private TestViewProvider CreateViewProvider()
+        {
+            var prefabs = new Dictionary<ViewKind, GameObject>();
+            foreach (ViewKind kind in Enum.GetValues(typeof(ViewKind)))
+            {
+                GameObject prefab = CreateObject($"Test {kind} prefab");
+                TransformAdapter adapter = CreateAdapter(prefab);
+                var view = prefab.AddComponent<EntityView>();
+                SetField(view, "_adapters", new EntityAdapter[] { adapter });
+                prefabs.Add(kind, prefab);
+            }
+
+            return new TestViewProvider(prefabs);
+        }
+
+        private static LevelDefinition CreateLevel() => LevelParser.Parse(
+            File.ReadAllText(Path.Combine(Application.dataPath, "Levels", "level-01.txt")));
+
+        private static Simulation SimulationOf(GameplayController controller)
+        {
+            object run = typeof(GameplayController).GetField("_run", BindingFlags.Instance | BindingFlags.NonPublic).GetValue(controller);
+            return (Simulation)run?.GetType().GetField("_simulation", BindingFlags.Instance | BindingFlags.NonPublic).GetValue(run);
+        }
+
+
+        private sealed class TestLevelSource : ILevelSource
+        {
+            private readonly Func<int, CancellationToken, UniTask<LevelDefinition>> _load;
+            public int LoadCalls { get; private set; }
+            public int Count { get; set; } = 3;
+            public CancellationToken LastToken { get; private set; }
+            public List<int> Requested { get; } = new List<int>();
+            public TestLevelSource(LevelDefinition content) : this((_, _) => UniTask.FromResult(content)) { }
+            public TestLevelSource(Func<int, CancellationToken, UniTask<LevelDefinition>> load) => _load = load;
+            public UniTask<LevelDefinition> LoadAsync(int index, CancellationToken ct)
+            {
+                LoadCalls++;
+                Requested.Add(index);
+                LastToken = ct;
+                return _load(index, ct);
+            }
+        }
+
+        private sealed class TestViewProvider : IViewProvider
+        {
+            private readonly Dictionary<ViewKind, GameObject> _prefabs;
+
+            public TestViewProvider(Dictionary<ViewKind, GameObject> prefabs)
+            {
+                _prefabs = prefabs;
+            }
+
+            public UniTask<GameObject> LoadAsync(ViewKey key, CancellationToken ct)
+            {
+                ct.ThrowIfCancellationRequested();
+                return UniTask.FromResult(_prefabs[key.Kind]);
+            }
+        }
+
         private sealed class TestInput : IPlayerInput
         {
             public bool RestartPressed { get; set; }
-            public MoveCommand ReadMove() => default;
+            public bool NextLevelPressed { get; set; }
+            public bool NextSkinPressed { get; set; }
+            public MoveCommand Move { get; set; }
+            public MoveCommand ReadMove() => Move;
+        }
+
+        private sealed class PendingOperation : AsyncOperationBase<GameObject>
+        {
+            public int DestroyCalls { get; private set; }
+            protected override void Execute() { }
+            public void Finish(GameObject result) => Complete(result, true, (Exception)null);
+            protected override void Destroy() => DestroyCalls++;
         }
         private static Simulation CreateSimulation(LevelDefinition level) =>
             new Simulation(level);

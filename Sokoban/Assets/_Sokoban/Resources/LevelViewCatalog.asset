@@ -12,8 +12,26 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 0ea6ff1de344a44469a3439f735a43ea, type: 3}
   m_Name: LevelViewCatalog
   m_EditorClassIdentifier: 
-  _floorPrefab: {fileID: 7864807308412324709, guid: 17f9d416439a491429a2372dbde41111, type: 3}
-  _wallPrefab: {fileID: 3019956986492254366, guid: 5d3fc6bac24fa1948a977bfa42658e50, type: 3}
-  _boxPrefab: {fileID: 1464484887366625871, guid: 973e30aed52df874a8a9b583c4cf06d6, type: 3}
-  _goalMaterial: {fileID: 2100000, guid: efe26027cacc84b409062a6cff9b90c4, type: 2}
-  _playerMaterial: {fileID: 2100000, guid: 5a7ca585a9b2b3c4587125916713263d, type: 2}
+  entries:
+  - Kind: 0
+    Skins:
+    - Skin: 0
+      Address: views/floor
+  - Kind: 1
+    Skins:
+    - Skin: 0
+      Address: views/wall
+  - Kind: 2
+    Skins:
+    - Skin: 0
+      Address: views/box
+  - Kind: 3
+    Skins:
+    - Skin: 0
+      Address: views/player
+    - Skin: 1
+      Address: views/player_alt
+  - Kind: 4
+    Skins:
+    - Skin: 0
+      Address: views/goal

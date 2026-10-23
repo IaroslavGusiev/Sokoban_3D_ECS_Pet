@@ -2,9 +2,9 @@ using DefaultEcs;
 using UnityEngine;
 using DefaultEcs.System;
 using Sokoban.Core.Components;
-using Sokoban.Unity.Ecs.Components;
+using Sokoban.Presentation.Ecs.Components;
 
-namespace Sokoban.Unity.Ecs.Systems
+namespace Sokoban.Presentation.Ecs.Systems
 {
     public sealed class GridTransformSyncSystem : AEntitySetSystem<float>
     {

@@ -1,7 +1,7 @@
 using System;
 using UnityEngine;
 
-namespace Sokoban.Unity.Ecs.Components
+namespace Sokoban.Presentation.Ecs.Components
 {
     [Serializable]
     public struct TransformComponent

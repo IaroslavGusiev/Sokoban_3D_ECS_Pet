@@ -1,11 +1,15 @@
 {
     "name": "Sokoban.Unity",
-    "rootNamespace": "Sokoban.Unity",
+    "rootNamespace": "Sokoban.Presentation",
     "references": [
         "Sokoban.Core",
 
         "Unity.InputSystem",
-        "Zenject"
+        "Zenject",
+        "Unity.Addressables",
+        "Unity.ResourceManager",
+        "UniTask",
+        "UniTask.Addressables"
     ],
     "includePlatforms": [],
     "excludePlatforms": [],

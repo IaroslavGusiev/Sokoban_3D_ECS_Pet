@@ -1,5 +1,6 @@
 // These scene integration tests run in the Editor's Play Mode without adding the scene to build settings.
 #if UNITY_EDITOR
+using System;
 using System.Collections;
 using DefaultEcs;
 using Sokoban.Core.Components;
@@ -7,10 +8,12 @@ using System.Linq;
 using System.Reflection;
 using NUnit.Framework;
 using Sokoban.Core.Commands;
-using Sokoban.Unity;
+using Sokoban.Presentation;
 using Sokoban.Core;
+using Sokoban.Presentation.Ecs.Components;
 using UnityEditor.SceneManagement;
 using UnityEngine;
+using UnityEngine.AddressableAssets;
 using UnityEngine.InputSystem;
 using UnityEngine.InputSystem.LowLevel;
 using UnityEngine.SceneManagement;
@@ -26,6 +29,14 @@ namespace Sokoban.Tests.PlayMode
         private GameplayController _controller;
         private Transform _levelRoot;
         private ViewCatalog _catalog;
+        private Simulation CurrentSimulation
+        {
+            get
+            {
+                object run = typeof(GameplayController).GetField("_run", BindingFlags.Instance | BindingFlags.NonPublic).GetValue(_controller);
+                return (Simulation)run?.GetType().GetField("_simulation", BindingFlags.Instance | BindingFlags.NonPublic).GetValue(run);
+            }
+        }
         private Keyboard _keyboard;
         private InputSettings.EditorInputBehaviorInPlayMode _editorInput;
         private InputSettings.BackgroundBehavior _backgroundInput;
@@ -50,6 +61,11 @@ namespace Sokoban.Tests.PlayMode
             Assert.That(tickable, Is.SameAs(_controller));
             _levelRoot = context.Container.Resolve<LevelRoot>().Transform;
             _catalog = context.Container.Resolve<ViewCatalog>();
+            float deadline = Time.realtimeSinceStartup + 10f;
+            while (typeof(GameplayController).GetField("_state", BindingFlags.Instance | BindingFlags.NonPublic)
+                .GetValue(_controller).ToString() != "Playing" && Time.realtimeSinceStartup < deadline) yield return null;
+            Assert.That(CurrentSimulation, Is.Not.Null, "Initial Addressable content did not load within 10 seconds.");
+            while (CurrentSimulation.World.Any(entity => !entity.Has<TransformComponent>()) && Time.realtimeSinceStartup < deadline) yield return null;
             Assert.That(Board.childCount, Is.EqualTo(76));
         }
 
@@ -118,7 +134,7 @@ namespace Sokoban.Tests.PlayMode
         {
             Transform previousBoard = Board;
             yield return Move(MoveCommand.Left);
-            _controller.Current.Send(MoveCommand.Up);
+            CurrentSimulation.Send(MoveCommand.Up);
             yield return Press(Key.R, Key.UpArrow);
             Assert.That(previousBoard == null, Is.True);
             Assert.That(_levelRoot.childCount, Is.EqualTo(1));
@@ -149,7 +165,7 @@ namespace Sokoban.Tests.PlayMode
             context.Container.Resolve<DisposableManager>().Remove(_controller);
             _controller.Dispose();
             Assert.That(previousBoard.gameObject.activeSelf, Is.False);
-            Assert.That(_controller.Current, Is.Null);
+            Assert.That(CurrentSimulation, Is.Null);
             yield return null;
             Assert.That(previousBoard == null, Is.True);
             Assert.That(_levelRoot.childCount, Is.Zero);
@@ -159,12 +175,12 @@ namespace Sokoban.Tests.PlayMode
         [UnityTest]
         public IEnumerator QueuedMove_WaitsForTickAndUpdatesBothActorsBeforeTickReturns()
         {
-            _controller.Current.Send(MoveCommand.Left);
+            CurrentSimulation.Send(MoveCommand.Left);
             AssertActors(new Vector3(3, 0, 2), new Vector3(2, 0, 3), new Vector3(4, 0, 3));
             TickController();
             AssertActors(new Vector3(2, 0, 2), new Vector3(2, 0, 3), new Vector3(4, 0, 3));
 
-            _controller.Current.Send(MoveCommand.Up);
+            CurrentSimulation.Send(MoveCommand.Up);
             TickController();
             AssertActors(new Vector3(2, 0, 3), new Vector3(2, 0, 4), new Vector3(4, 0, 3));
             TickController();
@@ -187,7 +203,7 @@ namespace Sokoban.Tests.PlayMode
         [UnityTest]
         public IEnumerator SceneUnload_ReleasesControllerWorldAndGeneratedViews()
         {
-            Simulation previous = _controller.Current;
+            Simulation previous = CurrentSimulation;
             int disposedWorlds = 0;
             using var subscription = previous.World.SubscribeWorldDisposed(_ => disposedWorlds++);
             Transform previousBoard = Board;
@@ -196,33 +212,31 @@ namespace Sokoban.Tests.PlayMode
             Assert.That(host == null, Is.True);
             Assert.That(previousBoard == null, Is.True);
             Assert.That(disposedWorlds, Is.EqualTo(1));
-            Assert.That(_controller.Current, Is.Null);
+            Assert.That(CurrentSimulation, Is.Null);
             _scene = default;
         }
 
         [UnityTest]
-        public IEnumerator FailedViewConstruction_ReleasesTheSimulationAndPartialBoardBeforeRetry()
+        public IEnumerator Restart_ReusesLoadedPrefabsAfterCatalogChanges()
         {
-            FieldInfo boxPrefab = typeof(ViewCatalog).GetField("_boxPrefab", BindingFlags.Instance | BindingFlags.NonPublic);
-            var originalPrefab = (GameObject)boxPrefab.GetValue(_catalog);
-            var invalidPrefab = new GameObject("Missing EntityView");
-            // Failed construction is outside the normal Zenject tick lifecycle.
-            SceneContext context = _scene.GetRootGameObjects().Select(root => root.GetComponent<SceneContext>())
-                .Single(component => component != null);
-            context.Container.Resolve<TickableManager>().Remove(_controller);
+            FieldInfo entries = typeof(ViewCatalog).GetField("entries", BindingFlags.Instance | BindingFlags.NonPublic);
+            var originalEntries = (ViewCatalog.KindEntry[])entries.GetValue(_catalog);
+            var invalidEntries = originalEntries.Select(entry => new ViewCatalog.KindEntry
+            {
+                Kind = entry.Kind, Skins = entry.Skins.Select(skin => new ViewCatalog.SkinEntry
+                {
+                    Skin = skin.Skin, Address = skin.Address
+                }).ToArray()
+            }).ToArray();
+            int boxIndex = Array.FindIndex(invalidEntries, entry => entry.Kind == ViewKind.Box);
+            Simulation previous = CurrentSimulation;
             try
             {
-                boxPrefab.SetValue(_catalog, invalidPrefab);
-
+                invalidEntries[boxIndex].Skins.Single(skin => skin.Skin == SkinId.Default).Address = "invalid";
+                entries.SetValue(_catalog, invalidEntries);
                 SetRestartInput();
-                Assert.Throws<System.InvalidOperationException>(() => TickController());
-                Assert.That(_controller.Current, Is.Null);
-                Assert.That(_levelRoot.Cast<Transform>().All(child => !child.gameObject.activeSelf), Is.True);
-                yield return null;
-                Assert.That(_levelRoot.childCount, Is.Zero);
-
-                boxPrefab.SetValue(_catalog, originalPrefab);
-                _controller.Initialize();
+                TickController();
+                Assert.That(CurrentSimulation, Is.Not.SameAs(previous));
                 Assert.That(Board.childCount, Is.EqualTo(76));
                 AssertActors(new Vector3(3, 0, 2), new Vector3(2, 0, 3), new Vector3(4, 0, 3));
                 yield return Move(MoveCommand.Left);
@@ -230,13 +244,12 @@ namespace Sokoban.Tests.PlayMode
             }
             finally
             {
-                boxPrefab.SetValue(_catalog, originalPrefab);
-                Object.Destroy(invalidPrefab);
+                entries.SetValue(_catalog, originalEntries);
             }
         }
 
         [UnityTest]
-        public IEnumerator WorldProjection_AlignsTheBoardUnderAnOffsetParentAndLeavesOrdinaryFloorsStatic()
+        public IEnumerator WorldProjection_AlignsAllEntityViewsUnderAnOffsetParent()
         {
             _levelRoot.position = new Vector3(10, 3, -4);
             _levelRoot.rotation = Quaternion.Euler(0, 37, 0);
@@ -259,7 +272,7 @@ namespace Sokoban.Tests.PlayMode
             View("Player (3, 2)").position = disturbed;
             TickController();
 
-            AssertPosition(floor, disturbed);
+            AssertPosition(floor, new Vector3(1, 0, 1));
             AssertPosition(wall, Vector3.zero);
             AssertPosition(goal, new Vector3(2, 0, 4));
             AssertActors(new Vector3(3, 0, 2), new Vector3(2, 0, 3), new Vector3(4, 0, 3));
@@ -284,7 +297,7 @@ namespace Sokoban.Tests.PlayMode
 
         private IEnumerator Move(MoveCommand command)
         {
-            _controller.Current.Send(command);
+            CurrentSimulation.Send(command);
             TickController();
             yield return null;
             yield return null;

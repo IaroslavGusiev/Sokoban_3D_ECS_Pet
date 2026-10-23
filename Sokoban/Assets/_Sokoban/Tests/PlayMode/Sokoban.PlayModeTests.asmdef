@@ -5,7 +5,10 @@
         "Sokoban.Unity",
         "Sokoban.Core",
         "Unity.InputSystem",
-        "Zenject"
+        "Zenject",
+        "UniTask",
+        "Unity.Addressables",
+        "Unity.ResourceManager"
     ],
     "overrideReferences": true,
     "precompiledReferences": [

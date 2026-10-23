@@ -1,0 +1,7 @@
+{
+    "name": "Sokoban.Editor.Tests",
+    "rootNamespace": "Sokoban.Tests.Editor",
+    "references": ["Sokoban.Editor", "Sokoban.Unity", "Unity.Addressables.Editor"],
+    "includePlatforms": ["Editor"],
+    "optionalUnityReferences": ["TestAssemblies"]
+}

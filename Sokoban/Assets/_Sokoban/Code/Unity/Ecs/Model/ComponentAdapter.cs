@@ -1,9 +1,8 @@
-using System;
 using DefaultEcs;
 using UnityEngine;
 using UnityEngine.Serialization;
 
-namespace Sokoban.Unity.Ecs.Model
+namespace Sokoban.Presentation.Ecs.Model
 {
     public abstract class ComponentAdapter<T> : EntityAdapter where T : struct
     {
@@ -12,12 +11,9 @@ namespace Sokoban.Unity.Ecs.Model
 
         public sealed override void Install(Entity entity)
         {
-            if (entity.Has<T>())
-            {
-                throw new InvalidOperationException($"The entity already has {typeof(T).Name}.");
-            }
-
             entity.Set(_value);
         }
+
+        public sealed override void Uninstall(Entity entity) => entity.Remove<T>();
     }
 }

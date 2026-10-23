@@ -13,14 +13,54 @@ namespace Sokoban.Tests.App
     public sealed class SimulationTests
     {
         [Test]
+        public void PushingOnlyBoxOntoGoal_CompletesOnceAfterMovement()
+        {
+            using var simulation = new Simulation(LevelParser.Parse("#####\n#@$.#\n#####"));
+            Entity player = simulation.World.Single(entity => entity.Has<PlayerTag>());
+            int completions = 0;
+            using var subscription = simulation.World.SubscribeComponentAdded<LevelCompletedTag>((in Entity entity, in LevelCompletedTag _) =>
+            {
+                Assert.That(entity, Is.EqualTo(player));
+                completions++;
+            });
+            Assert.That(simulation.IsCompleted, Is.False);
+            simulation.Tick(0f);
+            Assert.That(simulation.IsCompleted, Is.False);
+            simulation.Send(MoveCommand.Right);
+            Assert.That(simulation.IsCompleted, Is.False);
+            simulation.Tick(0f);
+            Assert.That(simulation.IsCompleted, Is.True);
+            simulation.Tick(0f);
+            simulation.Tick(1f);
+            Assert.That(simulation.IsCompleted, Is.True);
+            Assert.That(completions, Is.EqualTo(1));
+        }
+
+        [Test]
+        public void TwoBoxes_RequireBothGoalsToBeCovered()
+        {
+            using var simulation = new Simulation(LevelParser.Parse("#######\n#@$.--#\n#--$.-#\n#######"));
+            simulation.Send(MoveCommand.Right);
+            simulation.Tick(0f);
+            Assert.That(simulation.IsCompleted, Is.False);
+            simulation.Send(MoveCommand.Down);
+            simulation.Tick(0f);
+            simulation.Send(MoveCommand.Right);
+            simulation.Tick(0f);
+            Assert.That(simulation.IsCompleted, Is.True);
+        }
+
+        [Test]
         public void Simulation_PopulatesEntitiesFromItsDefinition()
         {
             LevelDefinition level = CreateLevel();
             using (var simulation = CreateSimulation(level))
             {
                 Entity[] entities = simulation.World.ToArray();
-                Assert.That(entities.Length, Is.EqualTo(29));
+                Assert.That(entities.Length, Is.EqualTo(level.Width * level.Height + level.Walls.Count + level.Boxes.Count + 1));
                 Assert.That(entities.All(entity => entity.Has<GridPosition>()), Is.True);
+                Assert.That(entities.Count(entity => entity.Has<FloorTag>()), Is.EqualTo(level.Width * level.Height));
+                Assert.That(entities.Where(entity => entity.Has<GoalTag>()).All(entity => entity.Has<FloorTag>()), Is.True);
                 Assert.That(Positions<WallTag>(simulation), Is.EquivalentTo(level.Walls));
                 Assert.That(Positions<BoxTag>(simulation), Is.EquivalentTo(level.Boxes));
                 Assert.That(Positions<GoalTag>(simulation), Is.EquivalentTo(level.Goals));

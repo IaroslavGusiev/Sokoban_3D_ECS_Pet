@@ -1,0 +1,10 @@
+{
+    "name": "Sokoban.Core.Tests",
+    "rootNamespace": "Sokoban.Tests.Core",
+    "references": ["Sokoban.Core"],
+    "includePlatforms": ["Editor"],
+    "overrideReferences": true,
+    "precompiledReferences": ["DefaultEcs.dll", "nunit.framework.dll"],
+    "optionalUnityReferences": ["TestAssemblies"],
+    "noEngineReferences": true
+}

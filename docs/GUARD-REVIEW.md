@@ -1,4 +1,6 @@
-# Layer refactor: guard review
+# Historical layer refactor: guard review
+
+This records the earlier layer-refactor state. The later text-content task adds parser/external-data validation and runs ViewCatalog.Validate in ServicesInstaller rather than controller Initialize. Current APIs, test counts, and pending Editor setup are documented in [ARCHITECTURE.md](ARCHITECTURE.md) and [ASYNC-CONTENT.md](ASYNC-CONTENT.md). The async migration explicitly permits the Playing-state check and cancellation/failure cleanup; the earlier policy entries below are historical.
 
 Implemented on 2026-10-22 in `Sokoban/Assets/_Sokoban/Code/Core` and `Unity`. This inventory covers runtime code, including domain branches retained by the guard policy. Test fixture checks are outside this policy. No new runtime guards were added.
 

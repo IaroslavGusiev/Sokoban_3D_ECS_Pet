@@ -1,6 +1,6 @@
 using UnityEngine;
 
-namespace Sokoban.Unity
+namespace Sokoban.Presentation
 {
     public sealed class LevelRoot
     {

@@ -1,4 +1,3 @@
-using System;
 using DefaultEcs;
 using Sokoban.Core.Commands;
 using Sokoban.Core.Components;
@@ -12,17 +11,13 @@ namespace Sokoban.Core
         private readonly SystemPipeline _pipeline;
 
         public World World { get; }
+        public bool IsCompleted => _player.Has<LevelCompletedTag>();
 
         public Simulation(LevelDefinition level) 
             : this(level, RuleFeatures.Create()) { }
 
         internal Simulation(LevelDefinition level, IReadOnlyList<IFeature> features)
         {
-            if (level == null)
-            {
-                throw new ArgumentNullException(nameof(level));
-            }
-
             World = new World();
             
             try
@@ -36,9 +31,6 @@ namespace Sokoban.Core
                 throw;
             }
         }
-
-        public void Tick(float deltaTime) => 
-            _pipeline.Tick(deltaTime);
 
         public void Dispose()
         {
@@ -54,13 +46,21 @@ namespace Sokoban.Core
 
         public void Send(MoveCommand command)
         {
-            if (command is not (MoveCommand.Up or MoveCommand.Down or MoveCommand.Left or MoveCommand.Right) 
-                || _player.Has<MoveRequest>())
+            if (IsNotValidCommand(command))
             {
                 return;
             }
 
             _player.Set(new MoveRequest(command));
+        }
+
+        public void Tick(float deltaTime) => 
+            _pipeline.Tick(deltaTime);
+
+        private bool IsNotValidCommand(MoveCommand command)
+        {
+            return command is not (MoveCommand.Up or MoveCommand.Down or MoveCommand.Left or MoveCommand.Right) 
+                   || _player.Has<MoveRequest>();
         }
     }
 }

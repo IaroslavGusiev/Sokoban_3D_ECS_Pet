@@ -1,6 +1,6 @@
 using Zenject;
 
-namespace Sokoban.Unity
+namespace Sokoban.Presentation
 {
     public sealed class GameplayInstaller : MonoInstaller
     {

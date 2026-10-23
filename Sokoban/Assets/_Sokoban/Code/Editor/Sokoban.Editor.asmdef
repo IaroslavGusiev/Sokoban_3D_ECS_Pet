@@ -1,0 +1,6 @@
+{
+    "name": "Sokoban.Editor",
+    "rootNamespace": "Sokoban.Editor",
+    "references": ["Sokoban.Unity", "Unity.Addressables.Editor"],
+    "includePlatforms": ["Editor"]
+}

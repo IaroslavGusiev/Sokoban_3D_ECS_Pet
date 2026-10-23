@@ -2,14 +2,13 @@ using System;
 using DefaultEcs;
 using UnityEngine;
 
-namespace Sokoban.Unity.Ecs.Model
+namespace Sokoban.Presentation.Ecs.Model
 {
     [DisallowMultipleComponent]
     public sealed class EntityView : MonoBehaviour
     {
         [SerializeField] private EntityAdapter[] _adapters = Array.Empty<EntityAdapter>();
 
-        // Views share the session lifetime. The session disposes the entity and its components.
         public void Install(Entity entity)
         {
             foreach (EntityAdapter adapter in _adapters)
@@ -25,5 +24,10 @@ namespace Sokoban.Unity.Ecs.Model
 
         private void Reset() => 
             _adapters = GetComponents<EntityAdapter>();
+
+        public void Uninstall(Entity entity)
+        {
+            foreach (EntityAdapter adapter in _adapters) adapter.Uninstall(entity);
+        }
     }
 }

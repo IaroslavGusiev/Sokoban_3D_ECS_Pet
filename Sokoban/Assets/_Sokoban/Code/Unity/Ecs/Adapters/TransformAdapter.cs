@@ -1,8 +1,8 @@
-using Sokoban.Unity.Ecs.Components;
-using Sokoban.Unity.Ecs.Model;
+using Sokoban.Presentation.Ecs.Components;
+using Sokoban.Presentation.Ecs.Model;
 using UnityEngine;
 
-namespace Sokoban.Unity.Ecs.Adapters
+namespace Sokoban.Presentation.Ecs.Adapters
 {
     [DisallowMultipleComponent]
     public sealed class TransformAdapter : ComponentAdapter<TransformComponent>
