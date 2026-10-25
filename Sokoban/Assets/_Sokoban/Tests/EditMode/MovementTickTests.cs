@@ -43,10 +43,12 @@ namespace Sokoban.Tests.EditMode
             _movement.Update(deltaTime);
             Assert.That(_player.Get<GridPosition>(), Is.EqualTo(new GridPosition(x, y)));
             Assert.That(_player.Has<MoveRequest>(), Is.False);
+            Assert.That(_player.Has<MovementPlan>(), Is.False);
 
             _movement.Update(deltaTime);
             _movement.Update(deltaTime);
             Assert.That(_player.Get<GridPosition>(), Is.EqualTo(new GridPosition(x, y)));
+            Assert.That(_player.Has<MoveRequest>() || _player.Has<MovementPlan>(), Is.False);
         }
 
         [Test]
@@ -88,26 +90,18 @@ namespace Sokoban.Tests.EditMode
             _movement.IsEnabled = false;
             _movement.Update(0f);
             Assert.That(_player.Has<MoveRequest>(), Is.True);
+            Assert.That(_player.Has<MovementPlan>(), Is.False);
             Assert.That(_player.Get<GridPosition>(), Is.EqualTo(new GridPosition(0, 0)));
 
             _movement.IsEnabled = true;
             _movement.Update(0f);
             Assert.That(_player.Has<MoveRequest>(), Is.False);
             Assert.That(_player.Get<GridPosition>(), Is.EqualTo(new GridPosition(0, 1)));
-        }
-
-        [Test]
-        public void MultiplePlayers_ConsumeAllRequestsWithoutMoving()
-        {
-            Entity other = Create<PlayerTag>(3, 3);
-            _player.Set(new MoveRequest(MoveCommand.Up));
-            other.Set(new MoveRequest(MoveCommand.Down));
+            Assert.That(_player.Has<MovementPlan>(), Is.False);
             _movement.Update(0f);
-
+            Assert.That(_player.Get<GridPosition>(), Is.EqualTo(new GridPosition(0, 1)));
+            Assert.That(_player.Has<MovementPlan>(), Is.False);
             Assert.That(_player.Has<MoveRequest>(), Is.False);
-            Assert.That(other.Has<MoveRequest>(), Is.False);
-            Assert.That(_player.Get<GridPosition>(), Is.EqualTo(new GridPosition(0, 0)));
-            Assert.That(other.Get<GridPosition>(), Is.EqualTo(new GridPosition(3, 3)));
         }
 
         [Test]

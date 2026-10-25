@@ -29,6 +29,11 @@ namespace Sokoban.Core
 
         internal Simulation(LevelDefinition level, LevelPopulator populator, float timeLimitSeconds, IReadOnlyList<IFeature> features)
         {
+            if (float.IsNaN(timeLimitSeconds) || float.IsInfinity(timeLimitSeconds) || timeLimitSeconds <= 0f)
+            {
+                throw new ArgumentOutOfRangeException(nameof(timeLimitSeconds));
+            }
+
             _timeLimitSeconds = timeLimitSeconds;
             World = new World();
             
@@ -71,8 +76,15 @@ namespace Sokoban.Core
             _player.Set(new MoveRequest(command));
         }
         
-        public void Tick(float deltaTime) => 
+        public void Tick(float deltaTime)
+        {
+            if (float.IsNaN(deltaTime) || float.IsInfinity(deltaTime) || deltaTime < 0f)
+            {
+                throw new ArgumentOutOfRangeException(nameof(deltaTime));
+            }
+
             _pipeline.Tick(deltaTime);
+        }
 
         private bool CanAcceptCommand(MoveCommand command)
         {

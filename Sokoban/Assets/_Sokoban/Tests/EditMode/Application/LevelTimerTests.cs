@@ -159,7 +159,8 @@ namespace Sokoban.Tests.App
         [TestCase(float.NegativeInfinity)]
         public void InvalidDuration_IsRejected(float duration)
         {
-            Assert.Throws<ArgumentOutOfRangeException>(() => Create(duration));
+            var exception = Assert.Throws<ArgumentOutOfRangeException>(() => Create(duration));
+            Assert.That(exception.ParamName, Is.EqualTo("timeLimitSeconds"));
         }
 
         [TestCase(-1f)]
@@ -169,9 +170,26 @@ namespace Sokoban.Tests.App
         public void InvalidTick_DoesNotChangeTimer(float deltaTime)
         {
             using var simulation = Create(1f);
-            Assert.Throws<ArgumentOutOfRangeException>(() => simulation.Tick(deltaTime));
+            Entity player = simulation.World.Single(entity => entity.Has<PlayerTag>());
+            Entity box = simulation.World.Single(entity => entity.Has<BoxTag>());
+            GridPosition playerStart = player.Get<GridPosition>();
+            GridPosition boxStart = box.Get<GridPosition>();
+            LevelResult result = simulation.Result;
+            simulation.Send(MoveCommand.Right);
+            var exception = Assert.Throws<ArgumentOutOfRangeException>(() => simulation.Tick(deltaTime));
+            Assert.That(exception.ParamName, Is.EqualTo("deltaTime"));
             Assert.That(simulation.RemainingSeconds, Is.EqualTo(1f));
             Assert.That(simulation.IsTimedOut, Is.False);
+            Assert.That(simulation.IsCompleted, Is.False);
+            Assert.That(player.Get<GridPosition>(), Is.EqualTo(playerStart));
+            Assert.That(box.Get<GridPosition>(), Is.EqualTo(boxStart));
+            Assert.That(player.Get<MoveRequest>().Command, Is.EqualTo(MoveCommand.Right));
+            Assert.That(player.Has<MovementPlan>(), Is.False);
+            Assert.That(simulation.Result.Moves, Is.EqualTo(result.Moves));
+            Assert.That(simulation.Result.ElapsedSeconds, Is.EqualTo(result.ElapsedSeconds));
+            simulation.Tick(0f);
+            Assert.That(simulation.IsCompleted, Is.True);
+            Assert.That(simulation.Result.Moves, Is.EqualTo(1));
         }
 
         private static Simulation Create(float duration) =>

@@ -30,6 +30,9 @@ namespace Sokoban.CoreTests
             simulation.Tick(0.25f);
             Assert.That(level.Get<MoveCount>().Value, Is.EqualTo(1));
             Assert.That(player.Has<MoveCount>(), Is.False);
+            Assert.That(simulation.World.Single(entity => entity.Has<PlayerTag>()), Is.EqualTo(player));
+            simulation.Tick(0f);
+            Assert.That(simulation.World.Single(entity => entity.Has<PlayerTag>()), Is.EqualTo(player));
         }
 
         [TestCase(false)]

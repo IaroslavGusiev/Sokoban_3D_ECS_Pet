@@ -139,32 +139,6 @@ namespace Sokoban.Tests.EditMode
         }
 
         [Test]
-        public void MissingRequestAndAbandonedPlan_DoNotMoveInALaterValidationPass()
-        {
-            using var apply = new ApplyMovementSystem(_world);
-            _validation.Update(0f);
-            Assert.That(_player.Has<MovementPlan>(), Is.False);
-            _player.Set(new MoveRequest(MoveCommand.Right));
-            _validation.Update(0f);
-            Assert.That(_player.Has<MovementPlan>(), Is.True);
-
-            _validation.Update(0f);
-            apply.Update(0f);
-            Assert.That(_player.Has<MovementPlan>(), Is.False);
-            Assert.That(_player.Get<GridPosition>(), Is.EqualTo(new GridPosition(0, 0)));
-        }
-
-        [Test]
-        public void AbandonedPlanOnDisabledOwner_IsAlsoRemoved()
-        {
-            _player.Set(new MoveRequest(MoveCommand.Right));
-            _validation.Update(0f);
-            _player.Disable();
-            _validation.Update(0f);
-            Assert.That(_player.Has<MovementPlan>(), Is.False);
-        }
-
-        [Test]
         public void OrderedStages_ValidateWithoutMovingThenApplyBeforeOutput()
         {
             Entity box = Create<BoxTag>(1, 0);

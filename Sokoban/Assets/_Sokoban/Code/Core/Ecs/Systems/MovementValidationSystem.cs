@@ -65,9 +65,8 @@ namespace Sokoban.Core.Systems
             }
 
             var from = player.Get<GridPosition>();
-            GridPosition to = from + step;
 
-            if (_walls.ContainsKey(to))
+            if (TryGetDestination(from, step, out GridPosition to) == false || _walls.ContainsKey(to))
             {
                 return null;
             }
@@ -82,14 +81,28 @@ namespace Sokoban.Core.Systems
         private MovementPlan? PlanPush(Entity box, MovementStep playerStep, GridPosition step)
         {
             var from = box.Get<GridPosition>();
-            GridPosition to = from + step;
 
-            if (_walls.ContainsKey(to) || _boxes.ContainsKey(to))
+            if (TryGetDestination(from, step, out GridPosition to) == false || _walls.ContainsKey(to) || _boxes.ContainsKey(to))
             {
                 return null;
             }
 
             return new MovementPlan(new MovementStep(box, from, to), playerStep);
+        }
+
+        private static bool TryGetDestination(GridPosition from, GridPosition step, out GridPosition destination)
+        {
+            long x = (long)from.X + step.X;
+            long y = (long)from.Y + step.Y;
+
+            if (x < int.MinValue || x > int.MaxValue || y < int.MinValue || y > int.MaxValue)
+            {
+                destination = default;
+                return false;
+            }
+
+            destination = new GridPosition((int)x, (int)y);
+            return true;
         }
     }
 }

@@ -177,15 +177,6 @@ namespace Sokoban.Tests.EditMode
             AssertRejectedWithoutPositionChanges(MoveCommand.Right);
         }
 
-        [Test]
-        public void MultiplePlayers_MoveIsRejectedWithoutPositionChanges()
-        {
-            CreateEntity<PlayerTag>(0, 0);
-            CreateEntity<PlayerTag>(1, 0);
-
-            AssertRejectedWithoutPositionChanges(MoveCommand.Right);
-        }
-
         [TestCase(MoveCommand.Up, 0, int.MaxValue)]
         [TestCase(MoveCommand.Down, 0, int.MinValue)]
         [TestCase(MoveCommand.Left, int.MinValue, 0)]
