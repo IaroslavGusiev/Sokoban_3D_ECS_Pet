@@ -1,5 +1,6 @@
 using System;
 using DefaultEcs;
+using System.Linq;
 using Sokoban.Core.Commands;
 using Sokoban.Core.Components;
 using System.Collections.Generic;
@@ -14,6 +15,8 @@ namespace Sokoban.Core
         private readonly MoveHistory _history = new();
         
         private readonly float _timeLimitSeconds;
+        private readonly LevelDefinition _initialLevel;
+        private List<SimulationInput> _inputs;
 
         public World World { get; }
 
@@ -28,9 +31,9 @@ namespace Sokoban.Core
         public LevelResult Result => new(_levelState.Get<MoveCount>().Value, _timeLimitSeconds - RemainingSeconds, RemainingSeconds);
 
         public Simulation(LevelDefinition level, LevelPopulator populator, float timeLimitSeconds)
-            : this(level, populator, timeLimitSeconds, RuleFeatures.Create()) { }
+            : this(level, populator, timeLimitSeconds, RuleFeatures.Create(), recordInputs: true) { }
 
-        internal Simulation(LevelDefinition level, LevelPopulator populator, float timeLimitSeconds, IReadOnlyList<IFeature> features)
+        internal Simulation(LevelDefinition level, LevelPopulator populator, float timeLimitSeconds, IReadOnlyList<IFeature> features, bool recordInputs = false)
         {
             if (float.IsNaN(timeLimitSeconds) || float.IsInfinity(timeLimitSeconds) || timeLimitSeconds <= 0f)
             {
@@ -38,11 +41,18 @@ namespace Sokoban.Core
             }
 
             _timeLimitSeconds = timeLimitSeconds;
+            _initialLevel = level;
+            
+            _inputs = recordInputs 
+                ? new List<SimulationInput>() 
+                : null;
+            
             World = new World();
             
             try
             {
                 _player = populator.Populate(World, level);
+                
                 _levelState = World.CreateEntity();
                 _levelState.Set<LevelStateTag>();
                 _levelState.Set(new LevelTimer(timeLimitSeconds));
@@ -67,12 +77,16 @@ namespace Sokoban.Core
             finally
             {
                 _history.Entries.Clear();
+                _inputs?.Clear();
+                _inputs = null;
                 World.Dispose();
             }
         }
 
         public void Send(MoveCommand command)
         {
+            _inputs?.Add(new SimulationInput(SimulationInputKind.Move, command));
+            
             if (CanAcceptCommand(command) == false)
             {
                 return;
@@ -83,6 +97,8 @@ namespace Sokoban.Core
 
         public bool RequestUndo()
         {
+            _inputs?.Add(new SimulationInput(SimulationInputKind.Undo));
+            
             if (CanUndo == false)
             {
                 return false;
@@ -100,6 +116,25 @@ namespace Sokoban.Core
             }
 
             _pipeline.Tick(deltaTime);
+            _inputs?.Add(new SimulationInput(SimulationInputKind.Tick, deltaTime: deltaTime));
+        }
+
+        public SimulationRecording ExportRecording()
+        {
+            return _inputs == null 
+                ? throw new InvalidOperationException("Recording export requires a live recording-enabled Simulation.") 
+                : new SimulationRecording(_initialLevel, _timeLimitSeconds, _inputs);
+        }
+
+        public GameplaySnapshot CaptureSnapshot()
+        {
+            var playerPosition = _player.Get<GridPosition>();
+
+            IEnumerable<GridPosition> positions = World
+                .Where(entity => entity.Has<BoxTag>())
+                .Select(entity => entity.Get<GridPosition>());
+
+            return new GameplaySnapshot(playerPosition, positions, Result, IsCompleted, IsTimedOut, CanUndo);
         }
 
         private bool CanAcceptCommand(MoveCommand command)

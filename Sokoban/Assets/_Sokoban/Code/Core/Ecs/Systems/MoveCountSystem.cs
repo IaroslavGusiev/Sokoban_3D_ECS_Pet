@@ -28,6 +28,7 @@ namespace Sokoban.Core.Systems
                 {
                     _lastPosition = _player.Get<GridPosition>();
                 }
+                
                 entity.Remove<UndoProcessedTag>();
                 return;
             }

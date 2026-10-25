@@ -20,6 +20,7 @@ namespace Sokoban.Core.Systems
                 .GetEntities()
                 .With<MovementPlan>()
                 .AsSet();
+            
             _levels = world.GetEntities()
                 .With<LevelStateTag>()
                 .With<MoveHistory>()

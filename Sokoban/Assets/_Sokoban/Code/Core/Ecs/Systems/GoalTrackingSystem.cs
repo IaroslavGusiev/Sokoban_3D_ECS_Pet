@@ -18,6 +18,7 @@ namespace Sokoban.Core.Systems
                 .AsSet(), useBuffer: true)
         {
             _world = world;
+            
             _goals = world.GetEntities()
                 .With<GoalTag>()
                 .With<GridPosition>()

@@ -32,6 +32,7 @@ namespace Sokoban.Presentation.Ecs.Systems
             }
 
             animator.Tick(deltaTime);
+            
             if (animator.IsPlaying == false)
             {
                 entity.Remove<BoxGoalFeedbackState>();

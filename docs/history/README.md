@@ -6,6 +6,7 @@ For implementation use [current architecture](../ARCHITECTURE.md); for running a
 
 | Record | Scope |
 | --- | --- |
+| [Core recording and replay](RECORDING-REPLAY.md) | Immutable API-input exports, independent replay ownership, gameplay snapshots, and per-tick verification. |
 | [Run-owned ECS undo](UNDO.md) | Successful-move history, undo gating and snapshot synchronization, debug controls, and verification. |
 | [Core contract resolution](CORE-CONTRACT-RESOLUTION.md) | Approved numeric/overflow guarantees, single-player and pipeline invariants, and the resolution of all 21 baseline failures. |
 | [Level results and finish](LEVEL-RESULTS-FINISH.md) | Animation cleanup, Core move/time results, public gameplay status, finish/replay, guard audit, and manual overlay setup. |

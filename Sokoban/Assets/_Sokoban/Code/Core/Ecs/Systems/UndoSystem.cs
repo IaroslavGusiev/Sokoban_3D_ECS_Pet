@@ -1,5 +1,5 @@
-using System.Linq;
 using DefaultEcs;
+using System.Linq;
 using DefaultEcs.System;
 using Sokoban.Core.Components;
 
@@ -19,24 +19,42 @@ namespace Sokoban.Core.Systems
                 .AsSet(), useBuffer: true)
         {
             _world = world;
+            
             _player = world.Single(entity => entity.Has<PlayerTag>());
-            _obstacles = world.GetEntities().With<GridPosition>().WithEither<WallTag>().Or<BoxTag>().AsSet();
+            
+            _obstacles = world
+                .GetEntities()
+                .With<GridPosition>()
+                .WithEither<WallTag>()
+                .Or<BoxTag>()
+                .AsSet();
+        }
+
+        public override void Dispose()
+        {
+            _obstacles.Dispose();
+            base.Dispose();
         }
 
         protected override void Update(float deltaTime, in Entity entity)
         {
             entity.Remove<UndoRequest>();
+            
             _player.Remove<MoveRequest>();
             _player.Remove<MovementPlan>();
+            
             entity.Set<UndoProcessedTag>();
+            
             var history = entity.Get<MoveHistory>();
+            
             if (entity.Has<LevelCompletedTag>() || entity.Has<LevelTimedOutTag>() || history.Entries.Count == 0)
             {
                 return;
             }
 
             CommittedMove move = history.Entries.Peek();
-            for (int index = 0; index < move.Plan.StepCount; index++)
+            
+            for (var index = 0; index < move.Plan.StepCount; index++)
             {
                 if (CanReverse(move.Plan[index]) == false || IsDestinationFree(move.Plan, move.Plan[index].ExpectedSource) == false)
                 {
@@ -44,10 +62,11 @@ namespace Sokoban.Core.Systems
                 }
             }
 
-            for (int index = 0; index < move.Plan.StepCount; index++)
+            for (var index = 0; index < move.Plan.StepCount; index++)
             {
                 MovementStep step = move.Plan[index];
                 step.Target.Set(step.ExpectedSource);
+                
                 if (step.Target.Has<BoxTag>())
                 {
                     step.Target.Set(new BoxGoalState(step.ExpectedSource));
@@ -56,12 +75,6 @@ namespace Sokoban.Core.Systems
 
             entity.Set(new MoveCount(move.PreviousMoveCount));
             history.Entries.Pop();
-        }
-
-        public override void Dispose()
-        {
-            _obstacles.Dispose();
-            base.Dispose();
         }
 
         private bool IsDestinationFree(MovementPlan plan, GridPosition destination)
@@ -73,8 +86,9 @@ namespace Sokoban.Core.Systems
                     continue;
                 }
 
-                bool participant = false;
-                for (int index = 0; index < plan.StepCount; index++)
+                var participant = false;
+                
+                for (var index = 0; index < plan.StepCount; index++)
                 {
                     participant |= plan[index].Target == obstacle;
                 }

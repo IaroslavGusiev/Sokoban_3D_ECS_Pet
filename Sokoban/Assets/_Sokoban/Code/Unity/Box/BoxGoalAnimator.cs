@@ -65,6 +65,7 @@ namespace Sokoban.Presentation
             }
 
             float nextTime = _feedback.elapsedTime + deltaTime;
+            
             if (nextTime >= _feedback.duration)
             {
                 _feedback.Complete();

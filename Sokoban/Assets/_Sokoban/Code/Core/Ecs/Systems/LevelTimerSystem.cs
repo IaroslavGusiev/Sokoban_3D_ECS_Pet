@@ -1,6 +1,6 @@
 using System;
-using System.Linq;
 using DefaultEcs;
+using System.Linq;
 using DefaultEcs.System;
 using Sokoban.Core.Components;
 
