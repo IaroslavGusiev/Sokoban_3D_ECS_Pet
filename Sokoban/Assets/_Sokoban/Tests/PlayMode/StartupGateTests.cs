@@ -475,12 +475,18 @@ namespace Sokoban.Tests.PlayMode
             Assert.That(StateOf(controller), Is.EqualTo("Playing"));
             Assert.That(controller.RemainingSeconds, Is.EqualTo(1f));
             Simulation previous = SimulationOf(controller);
+            Entity previousLevel = previous.World.Single(entity => entity.Has<LevelStateTag>());
+            Assert.That(previousLevel.Get<LevelTimer>().RemainingSeconds, Is.EqualTo(1f));
             bool disposed = false;
             using var subscription = previous.World.SubscribeWorldDisposed(_ => disposed = true);
             controller.Tick(1f);
             Assert.That(StateOf(controller), Is.EqualTo("BindingViews"));
             Assert.That(disposed, Is.True);
             Assert.That(SimulationOf(controller), Is.Not.SameAs(previous));
+            Entity freshLevel = SimulationOf(controller).World.Single(entity => entity.Has<LevelStateTag>());
+            Assert.That(freshLevel.World, Is.Not.SameAs(previous.World));
+            Assert.That(freshLevel.Get<MoveCount>().Value, Is.Zero);
+            Assert.That(freshLevel.Has<LevelTimedOutTag>() || freshLevel.Has<LevelCompletedTag>(), Is.False);
             Assert.That(controller.RemainingSeconds, Is.EqualTo(1f));
             Assert.That(source.Requests, Is.EqualTo(new[] { 0 }));
             controller.Tick(20f);
@@ -574,16 +580,25 @@ namespace Sokoban.Tests.PlayMode
             controller.Initialize();
             controller.Tick(20f);
             Simulation simulation = SimulationOf(controller);
+            Entity previousLevel = simulation.World.Single(entity => entity.Has<LevelStateTag>());
+            bool disposed = false;
+            using var subscription = simulation.World.SubscribeWorldDisposed(_ => disposed = true);
             simulation.World.Single(entity => entity.Has<BoxTag>()).Set(new GridPosition(4, 2));
             controller.Tick(winningDelta);
             Assert.That(StateOf(controller), Is.EqualTo("Completed"));
             Assert.That(controller.RemainingSeconds, Is.EqualTo(5f));
+            Assert.That(previousLevel.Has<LevelCompletedTag>(), Is.True);
             controller.Tick(0.5f);
             Assert.That(controller.RemainingSeconds, Is.EqualTo(5f));
             controller.Tick(0.25f);
             Assert.That(source.Requests, Is.EqualTo(new[] { 0, 1 }));
             Assert.That(StateOf(controller), Is.EqualTo("BindingViews"));
             Assert.That(controller.RemainingSeconds, Is.EqualTo(5f));
+            Assert.That(disposed, Is.True);
+            Entity freshLevel = SimulationOf(controller).World.Single(entity => entity.Has<LevelStateTag>());
+            Assert.That(freshLevel.World, Is.Not.SameAs(simulation.World));
+            Assert.That(freshLevel.Get<MoveCount>().Value, Is.Zero);
+            Assert.That(freshLevel.Has<LevelCompletedTag>() || freshLevel.Has<LevelTimedOutTag>(), Is.False);
         }
 
         [Test]
@@ -918,6 +933,40 @@ namespace Sokoban.Tests.PlayMode
             Entity player = SimulationOf(controller).World.Single(e => e.Has<PlayerTag>());
             Assert.That(player.Get<ViewMove>().Duration, Is.EqualTo(0.4f));
             Assert.That(player.Get<TransformComponent>().Transform.position.x, Is.EqualTo(2.25f).Within(0.001f));
+        }
+
+        [Test]
+        public void LevelState_DoesNotRequestOrBindAViewAndRestartCreatesFreshState()
+        {
+            var provider = new Provider();
+            provider.Complete(CreateObject("Prefab"));
+            var source = new Source();
+            using var controller = CreateController(new Input(), source, provider, 5f);
+            controller.Initialize();
+            controller.Tick(0f);
+            Simulation previous = SimulationOf(controller);
+            Entity level = previous.World.Single(entity => entity.Has<LevelStateTag>());
+            bool disposed = false;
+            using var subscription = previous.World.SubscribeWorldDisposed(_ => disposed = true);
+            int visualCount = source.Definition.Width * source.Definition.Height + source.Definition.Boxes.Count + 1;
+            Assert.That(previous.World.Count(), Is.EqualTo(visualCount + 1));
+            Assert.That(provider.Requests.Count, Is.EqualTo(visualCount));
+            Assert.That(previous.World.Count(entity => entity.Has<TransformComponent>()), Is.EqualTo(visualCount));
+            Assert.That(level.Has<GridPosition>() || level.Has<TransformComponent>() || level.Has<ViewPending>()
+                || level.Has<ViewFailed>() || level.Has<ViewSkin>(), Is.False);
+            controller.Tick(1f);
+            controller.RequestRestart();
+            controller.Tick(0f);
+            Assert.That(disposed, Is.True);
+            Simulation fresh = SimulationOf(controller);
+            Entity freshLevel = fresh.World.Single(entity => entity.Has<LevelStateTag>());
+            Assert.That(freshLevel.World, Is.SameAs(fresh.World));
+            Assert.That(freshLevel.World, Is.Not.SameAs(previous.World));
+            Assert.That(freshLevel.Get<LevelTimer>().RemainingSeconds, Is.EqualTo(5f));
+            Assert.That(freshLevel.Get<MoveCount>().Value, Is.Zero);
+            Assert.That(freshLevel.Has<LevelCompletedTag>() || freshLevel.Has<LevelTimedOutTag>(), Is.False);
+            Assert.That(provider.Requests.Count, Is.EqualTo(visualCount * 2));
+            Assert.That(fresh.World.Count(entity => entity.Has<TransformComponent>()), Is.EqualTo(visualCount));
         }
 
         private static void CompleteCurrentLevel(GameplayController controller)

@@ -73,8 +73,11 @@ namespace Sokoban.Tests.PlayMode
             while (_controller.Phase != GameplayPhase.Playing && Time.realtimeSinceStartup < deadline) yield return null;
             Assert.That(CurrentSimulation, Is.Not.Null, "Initial Addressable content did not load within 10 seconds.");
             _catalog = context.Container.Resolve<IStaticDataProvider>().GetViewCatalog();
-            while (CurrentSimulation.World.Any(entity => !entity.Has<TransformComponent>()) && Time.realtimeSinceStartup < deadline) yield return null;
+            while (CurrentSimulation.World.Any(entity => entity.Has<GridPosition>() && !entity.Has<TransformComponent>()) && Time.realtimeSinceStartup < deadline) yield return null;
             Assert.That(Board.childCount, Is.EqualTo(76));
+            Assert.That(CurrentSimulation.World.Count(), Is.EqualTo(77));
+            Entity levelState = CurrentSimulation.World.Single(entity => entity.Has<LevelStateTag>());
+            Assert.That(levelState.Has<TransformComponent>() || levelState.Has<ViewPending>() || levelState.Has<ViewSkin>(), Is.False);
         }
 
         [UnityTearDown]

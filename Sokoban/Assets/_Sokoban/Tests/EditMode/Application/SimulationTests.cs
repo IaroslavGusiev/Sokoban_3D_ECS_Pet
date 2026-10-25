@@ -17,10 +17,12 @@ namespace Sokoban.Tests.App
         {
             using var simulation = new Simulation(LevelParser.Parse("#####\n#@$.#\n#####"), new LevelPopulator(), 60f);
             Entity player = simulation.World.Single(entity => entity.Has<PlayerTag>());
+            Entity levelState = simulation.World.Single(entity => entity.Has<LevelStateTag>());
             int completions = 0;
             using var subscription = simulation.World.SubscribeComponentAdded<LevelCompletedTag>((in Entity entity, in LevelCompletedTag _) =>
             {
-                Assert.That(entity, Is.EqualTo(player));
+                Assert.That(entity, Is.EqualTo(levelState));
+                Assert.That(player.Has<LevelCompletedTag>(), Is.False);
                 completions++;
             });
             Assert.That(simulation.IsCompleted, Is.False);
@@ -57,8 +59,9 @@ namespace Sokoban.Tests.App
             using (var simulation = CreateSimulation(level))
             {
                 Entity[] entities = simulation.World.ToArray();
-                Assert.That(entities.Length, Is.EqualTo(level.Width * level.Height + level.Walls.Count + level.Boxes.Count + 1));
-                Assert.That(entities.All(entity => entity.Has<GridPosition>()), Is.True);
+                Assert.That(entities.Length, Is.EqualTo(level.Width * level.Height + level.Walls.Count + level.Boxes.Count + 2));
+                Assert.That(entities.Where(entity => !entity.Has<LevelStateTag>()).All(entity => entity.Has<GridPosition>()), Is.True);
+                Assert.That(entities.Single(entity => entity.Has<LevelStateTag>()).Has<GridPosition>(), Is.False);
                 Assert.That(entities.Count(entity => entity.Has<FloorTag>()), Is.EqualTo(level.Width * level.Height));
                 Assert.That(entities.Where(entity => entity.Has<GoalTag>()).All(entity => entity.Has<FloorTag>()), Is.True);
                 Assert.That(Positions<WallTag>(simulation), Is.EquivalentTo(level.Walls));
@@ -96,11 +99,11 @@ namespace Sokoban.Tests.App
                 simulation.Tick(0f);
                 simulation.Send(MoveCommand.Left);
                 simulation.Tick(0f);
-                GridPosition[] before = simulation.World.Select(entity => entity.Get<GridPosition>()).ToArray();
+                GridPosition[] before = simulation.World.Where(entity => entity.Has<GridPosition>()).Select(entity => entity.Get<GridPosition>()).ToArray();
 
                 simulation.Send(MoveCommand.Left);
                 simulation.Tick(0f);
-                Assert.That(simulation.World.Select(entity => entity.Get<GridPosition>()), Is.EqualTo(before));
+                Assert.That(simulation.World.Where(entity => entity.Has<GridPosition>()).Select(entity => entity.Get<GridPosition>()), Is.EqualTo(before));
             }
         }
 

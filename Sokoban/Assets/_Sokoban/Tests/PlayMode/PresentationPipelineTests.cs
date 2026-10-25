@@ -77,7 +77,7 @@ namespace Sokoban.Tests.PlayMode
             AssertPosition(actor.transform, new Vector3(5, 0, 5));
             actor.SetActive(true);
             Assert.That(player.Get<TransformComponent>().Transform, Is.SameAs(actor.transform));
-            Assert.That(simulation.World.Count(), Is.EqualTo(76));
+            Assert.That(simulation.World.Count(), Is.EqualTo(77));
             yield return null;
         }
 
@@ -229,7 +229,7 @@ namespace Sokoban.Tests.PlayMode
 
             view.Install(player);
             Assert.That(player.Get<TransformComponent>().Transform, Is.SameAs(adapter.transform));
-            Assert.That(simulation.World.Count(), Is.EqualTo(76));
+            Assert.That(simulation.World.Count(), Is.EqualTo(77));
             Assert.DoesNotThrow(() => view.Install(player));
             yield return null;
         }

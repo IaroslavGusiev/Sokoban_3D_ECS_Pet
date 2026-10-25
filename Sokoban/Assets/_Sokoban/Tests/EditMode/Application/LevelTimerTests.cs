@@ -34,6 +34,11 @@ namespace Sokoban.Tests.App
             Assert.That(simulation.IsCompleted, Is.True);
             Assert.That(simulation.IsTimedOut, Is.False);
             var box = simulation.World.Single(entity => entity.Has<BoxTag>());
+            Entity levelState = simulation.World.Single(entity => entity.Has<LevelStateTag>());
+            Entity player = simulation.World.Single(entity => entity.Has<PlayerTag>());
+            Assert.That(levelState.Has<LevelCompletedTag>(), Is.True);
+            Assert.That(player.Has<LevelCompletedTag>() || player.Has<LevelTimedOutTag>(), Is.False);
+            Assert.That(simulation.Result.Moves, Is.EqualTo(1));
             var goal = simulation.World.Single(entity => entity.Has<GoalTag>());
             Assert.That(box.Get<GridPosition>(), Is.EqualTo(goal.Get<GridPosition>()));
             simulation.Tick(10f);
@@ -58,6 +63,8 @@ namespace Sokoban.Tests.App
             Assert.That(simulation.IsCompleted, Is.False);
             Assert.That(player.Has<MoveRequest>(), Is.False);
             Assert.That(player.Has<MovementPlan>(), Is.False);
+            Assert.That(simulation.World.Single(entity => entity.Has<LevelStateTag>()).Has<LevelTimedOutTag>(), Is.True);
+            Assert.That(player.Has<LevelTimedOutTag>() || player.Has<LevelCompletedTag>(), Is.False);
             Assert.That(player.Get<GridPosition>(), Is.EqualTo(playerStart));
             Assert.That(box.Get<GridPosition>(), Is.EqualTo(boxStart));
             simulation.Send(MoveCommand.Right);
@@ -118,8 +125,9 @@ namespace Sokoban.Tests.App
             using var subscription = simulation.World.SubscribeComponentChanged<LevelTimer>(
                 (in Entity entity, in LevelTimer previous, in LevelTimer current) =>
                 {
-                    entity.Set(new MoveRequest(MoveCommand.Left));
-                    entity.Set(default(MovementPlan));
+                    Assert.That(entity.Has<LevelStateTag>(), Is.True);
+                    player.Set(new MoveRequest(MoveCommand.Left));
+                    player.Set(default(MovementPlan));
                 });
             simulation.Tick(1f);
             Assert.That(simulation.IsTimedOut, Is.True);

@@ -290,12 +290,23 @@ namespace Sokoban.Tests.PlayMode
             using var layer = new ViewLayer(new LevelRoot(CreateObject("Simulation root").transform), simulation.World,
                 new FakeViewProvider(_ => prefab), new ViewFeatures(), new RunOptions(SkinId.Default, 60f, 0.16f));
             var before = new Dictionary<Entity, GridPosition>();
-            foreach (Entity entity in simulation.World) before.Add(entity, entity.Get<GridPosition>());
+            Entity levelState = default;
+            foreach (Entity entity in simulation.World)
+            {
+                if (entity.Has<GridPosition>()) before.Add(entity, entity.Get<GridPosition>());
+                if (entity.Has<LevelStateTag>()) levelState = entity;
+            }
+            float remaining = simulation.RemainingSeconds;
+            int moves = simulation.Result.Moves;
             layer.Tick(0f);
             layer.SetPlayerSkin(SkinId.Alternate);
             layer.Tick(0f);
             await UniTask.NextFrame();
-            foreach (Entity entity in simulation.World) Assert.That(entity.Get<GridPosition>(), Is.EqualTo(before[entity]));
+            foreach (KeyValuePair<Entity, GridPosition> position in before)
+                Assert.That(position.Key.Get<GridPosition>(), Is.EqualTo(position.Value));
+            Assert.That(levelState.Has<TransformComponent>() || levelState.Has<ViewSkin>(), Is.False);
+            Assert.That(simulation.RemainingSeconds, Is.EqualTo(remaining));
+            Assert.That(simulation.Result.Moves, Is.EqualTo(moves));
             Assert.That(simulation.IsCompleted, Is.False);
         });
 

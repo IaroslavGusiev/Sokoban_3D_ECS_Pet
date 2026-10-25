@@ -8,15 +8,15 @@ namespace Sokoban.Core.Systems
     {
         private readonly EntitySet _goals;
         private readonly EntitySet _boxes;
-        private readonly EntitySet _players;
+        private readonly EntitySet _levels;
 
         public bool IsEnabled { get; set; } = true;
 
         public WinCheckSystem(World world)
         {
-            _players = world
+            _levels = world
                 .GetEntities()
-                .With<PlayerTag>()
+                .With<LevelStateTag>()
                 .Without<LevelTimedOutTag>()
                 .AsSet();
             
@@ -35,11 +35,11 @@ namespace Sokoban.Core.Systems
 
         public void Update(float deltaTime)
         {
-            foreach (Entity player in _players.GetEntities())
+            foreach (Entity level in _levels.GetEntities())
             {
-                if (player.Has<LevelCompletedTag>() == false && AllGoalsCovered())
+                if (level.Has<LevelCompletedTag>() == false && AllGoalsCovered())
                 {
-                    player.Set<LevelCompletedTag>();
+                    level.Set<LevelCompletedTag>();
                 }
             }
         }
@@ -48,7 +48,7 @@ namespace Sokoban.Core.Systems
         {
             _boxes.Dispose();
             _goals.Dispose();
-            _players.Dispose();
+            _levels.Dispose();
         }
 
         private bool AllGoalsCovered()

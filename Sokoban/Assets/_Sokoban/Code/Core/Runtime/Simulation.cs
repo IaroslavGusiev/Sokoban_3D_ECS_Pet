@@ -9,19 +9,20 @@ namespace Sokoban.Core
     public sealed class Simulation : IDisposable
     {
         private readonly Entity _player;
+        private readonly Entity _levelState;
         private readonly SystemPipeline _pipeline;
         
         private readonly float _timeLimitSeconds;
 
         public World World { get; }
 
-        public bool IsTimedOut => _player.Has<LevelTimedOutTag>();
+        public bool IsTimedOut => _levelState.Has<LevelTimedOutTag>();
 
-        public bool IsCompleted => _player.Has<LevelCompletedTag>();
+        public bool IsCompleted => _levelState.Has<LevelCompletedTag>();
 
-        public float RemainingSeconds => _player.Get<LevelTimer>().RemainingSeconds;
+        public float RemainingSeconds => _levelState.Get<LevelTimer>().RemainingSeconds;
         
-        public LevelResult Result => new(_player.Get<MoveCount>().Value, _timeLimitSeconds - RemainingSeconds, RemainingSeconds);
+        public LevelResult Result => new(_levelState.Get<MoveCount>().Value, _timeLimitSeconds - RemainingSeconds, RemainingSeconds);
 
         public Simulation(LevelDefinition level, LevelPopulator populator, float timeLimitSeconds)
             : this(level, populator, timeLimitSeconds, RuleFeatures.Create()) { }
@@ -34,8 +35,10 @@ namespace Sokoban.Core
             try
             {
                 _player = populator.Populate(World, level);
-                _player.Set(new LevelTimer(timeLimitSeconds));
-                _player.Set(new MoveCount(0, _player.Get<GridPosition>()));
+                _levelState = World.CreateEntity();
+                _levelState.Set<LevelStateTag>();
+                _levelState.Set(new LevelTimer(timeLimitSeconds));
+                _levelState.Set(new MoveCount(0));
                 
                 _pipeline = new SystemPipeline(World, features);
             }
