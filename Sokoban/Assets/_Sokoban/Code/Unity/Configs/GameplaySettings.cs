@@ -10,11 +10,5 @@ namespace Sokoban.Presentation
         [field: SerializeField] public float CompletionDelaySeconds { get; private set; } = 0.75f;
 
         [field: SerializeField] public float MoveDurationSeconds { get; private set; } = 0.16f;
-
-        [field: SerializeField] public float BoxGoalBumpDurationSeconds { get; private set; } = 0.22f;
-
-        [field: SerializeField] public float BoxGoalBumpHeight { get; private set; } = 0.12f;
-
-        [field: SerializeField] public float BoxGoalSquashAmount { get; private set; } = 0.12f;
     }
 }

@@ -24,7 +24,6 @@ namespace Sokoban.Tests.PlayMode
     {
         private readonly List<GameObject> _objects = new();
         private float _timeScale;
-        private static BoxGoalFeedbackOptions Options => new(0.22f, 0.12f, 0.12f);
 
         [SetUp]
         public void SetUp() => _timeScale = Time.timeScale;
@@ -137,12 +136,12 @@ namespace Sokoban.Tests.PlayMode
             Vector3 scale = visual.localScale;
             for (int index = 0; index < 8; index++)
             {
-                animator.PlayGoalFeedback(Options);
+                animator.PlayGoalFeedback();
                 animator.Tick(0.055f);
-                Assert.That(visual.localPosition.y - baseline.y, Is.InRange(0f, Options.Height + 0.001f));
+                Assert.That(visual.localPosition.y - baseline.y, Is.InRange(0f, 0.121f));
                 Assert.That(visual.localScale.x, Is.GreaterThan(scale.x));
             }
-            animator.Tick(Options.DurationSeconds);
+            animator.Tick(0.22f);
             AssertRestored(animator, visual, baseline, scale);
             animator.StopAndRestore();
             animator.StopAndRestore();
@@ -267,12 +266,12 @@ namespace Sokoban.Tests.PlayMode
             BoxGoalAnimator animator = Bind(Box(world), out Transform visual);
             Vector3 baseline = visual.localPosition;
             Vector3 scale = visual.localScale;
-            animator.PlayGoalFeedback(Options);
+            animator.PlayGoalFeedback();
             animator.Tick(0.05f);
             animator.gameObject.SetActive(false);
             AssertRestored(animator, visual, baseline, scale);
             animator.gameObject.SetActive(true);
-            animator.PlayGoalFeedback(Options);
+            animator.PlayGoalFeedback();
             animator.Tick(0.05f);
             Object.Destroy(animator.gameObject);
             Assert.That(animator.IsPlaying, Is.False);
@@ -287,7 +286,7 @@ namespace Sokoban.Tests.PlayMode
             var boxPrefab = CreateView();
             var fallback = CreateObject("Fallback");
             var provider = new Provider(boxPrefab, fallback);
-            var options = new RunOptions(SkinId.Default, 60f, 0.16f, Options);
+            var options = new RunOptions(SkinId.Default, 60f, 0.16f);
             LevelDefinition level = LevelParser.Parse("#####\n#@$.#\n#####");
             var run = new LevelRun(new LevelRoot(parent.transform), level, provider, new ViewFeatures(), new LevelPopulator(), options);
             run.Send(MoveCommand.Right);
@@ -311,7 +310,7 @@ namespace Sokoban.Tests.PlayMode
         }
 
         private static SequentialSystem<float> Pipeline(World world) =>
-            new(new BoxGoalFeedbackLifecycleSystem(world), new BoxGoalFeedbackSystem(world, Options));
+            new(new BoxGoalFeedbackLifecycleSystem(world), new BoxGoalFeedbackSystem(world));
 
         [UnityTest]
         public IEnumerator ControllerLoading_PausesFeedbackUntilTheRetainedRunIsReplaced()
@@ -362,6 +361,48 @@ namespace Sokoban.Tests.PlayMode
             }
         }
 
+        [Test]
+        public void SerializedTuning_DrivesParameterlessPlayback()
+        {
+            GameObject root = CreateView(0.4f, 0.3f, 0.2f);
+            var animator = root.GetComponent<BoxGoalAnimator>();
+            Transform visual = root.transform.Find("Visual");
+            Vector3 baseline = visual.localPosition;
+            Vector3 scale = visual.localScale;
+            animator.PlayGoalFeedback();
+            animator.Tick(0.1f);
+            Assert.That(visual.localScale.x, Is.EqualTo(scale.x * 1.2f).Within(0.00001f));
+            Assert.That(visual.localScale.y, Is.EqualTo(scale.y * 0.8f).Within(0.00001f));
+            animator.Tick(0.1f);
+            Assert.That(visual.localPosition.y, Is.EqualTo(baseline.y + 0.3f).Within(0.00001f));
+            Assert.That(visual.localScale.y, Is.EqualTo(scale.y * 1.1f).Within(0.00001f));
+            Assert.That(animator.IsPlaying, Is.True);
+            animator.Tick(0.2f);
+            AssertRestored(animator, visual, baseline, scale);
+        }
+
+        [Test]
+        public void SavedBoxPrefab_PreservesAuthoredFeedbackTuning()
+        {
+            var prefab = AssetDatabase.LoadAssetAtPath<GameObject>("Assets/AddressablesDependencies/Box/Prefabs/Box.prefab");
+            GameObject root = Object.Instantiate(prefab);
+            _objects.Add(root);
+            var animator = root.GetComponent<BoxGoalAnimator>();
+            Transform visual = root.transform.Find("Visual");
+            Vector3 baseline = visual.localPosition;
+            Vector3 scale = visual.localScale;
+            Vector3 rootPosition = root.transform.position;
+            animator.PlayGoalFeedback();
+            animator.Tick(0.055f);
+            Assert.That(visual.localScale.y, Is.EqualTo(scale.y * 0.88f).Within(0.00001f));
+            animator.Tick(0.055f);
+            Assert.That(visual.localPosition.y, Is.EqualTo(baseline.y + 0.12f).Within(0.00001f));
+            Assert.That(animator.IsPlaying, Is.True);
+            animator.Tick(0.11f);
+            AssertRestored(animator, visual, baseline, scale);
+            Assert.That(root.transform.position, Is.EqualTo(rootPosition));
+        }
+
         private static void AssertRestored(BoxGoalAnimator animator, Transform visual, Vector3 position, Vector3 scale)
         {
             Assert.That(animator.IsPlaying, Is.False);
@@ -388,7 +429,7 @@ namespace Sokoban.Tests.PlayMode
             return root.GetComponent<BoxGoalAnimator>();
         }
 
-        private GameObject CreateView()
+        private GameObject CreateView(float durationSeconds = 0.22f, float height = 0.12f, float squashAmount = 0.12f)
         {
             GameObject root = CreateObject("Box root");
             root.SetActive(false);
@@ -399,6 +440,9 @@ namespace Sokoban.Tests.PlayMode
             var animator = root.AddComponent<BoxGoalAnimator>();
             var animatorData = new SerializedObject(animator);
             animatorData.FindProperty("visual").objectReferenceValue = visual;
+            animatorData.FindProperty("durationSeconds").floatValue = durationSeconds;
+            animatorData.FindProperty("height").floatValue = height;
+            animatorData.FindProperty("squashAmount").floatValue = squashAmount;
             animatorData.ApplyModifiedPropertiesWithoutUndo();
             var adapter = root.AddComponent<BoxGoalFeedbackAdapter>();
             var adapterData = new SerializedObject(adapter);

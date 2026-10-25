@@ -57,7 +57,7 @@ namespace Sokoban.Presentation
                     player.Set(new ViewSkin(options.Skin));
                 }
                 
-                var context = new ViewContext(_root, provider, _cancellation.Token, options.MoveDurationSeconds, options.GoalFeedback);
+                var context = new ViewContext(_root, provider, _cancellation.Token, options.MoveDurationSeconds);
                 _pipeline = new SystemPipeline(world, features.Create(context));
             }
             catch

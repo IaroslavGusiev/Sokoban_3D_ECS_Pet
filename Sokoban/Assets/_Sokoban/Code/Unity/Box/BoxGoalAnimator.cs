@@ -7,6 +7,9 @@ namespace Sokoban.Presentation
     public sealed class BoxGoalAnimator : MonoBehaviour
     {
         [SerializeField] private Transform visual;
+        [SerializeField] private float durationSeconds = 0.22f;
+        [SerializeField] private float height = 0.12f;
+        [SerializeField] private float squashAmount = 0.12f;
 
         private Vector3 _basePosition;
         private Vector3 _baseScale;
@@ -28,28 +31,28 @@ namespace Sokoban.Presentation
         private void Reset() => 
             visual = transform.Find("Visual");
 
-        public void PlayGoalFeedback(BoxGoalFeedbackOptions options)
+        public void PlayGoalFeedback()
         {
             CapturePose();
             StopAndRestore();
 
-            if (options.DurationSeconds <= 0f)
+            if (durationSeconds <= 0f)
             {
                 return;
             }
 
-            float halfDuration = options.DurationSeconds * 0.5f;
-            Vector3 peakPosition = _basePosition + Vector3.up * options.Height;
-            Vector3 squash = Vector3.Scale(_baseScale, new Vector3(1f + options.ScaleAmount, 1f - options.ScaleAmount, 1f + options.ScaleAmount));
-            Vector3 stretch = Vector3.Scale(_baseScale, new Vector3(1f - options.ScaleAmount * 0.5f, 1f + options.ScaleAmount * 0.5f, 1f - options.ScaleAmount * 0.5f));
+            float halfDuration = durationSeconds * 0.5f;
+            Vector3 peakPosition = _basePosition + Vector3.up * height;
+            Vector3 squash = Vector3.Scale(_baseScale, new Vector3(1f + squashAmount, 1f - squashAmount, 1f + squashAmount));
+            Vector3 stretch = Vector3.Scale(_baseScale, new Vector3(1f - squashAmount * 0.5f, 1f + squashAmount * 0.5f, 1f - squashAmount * 0.5f));
 
             _feedback = Sequence.Create(useUnscaledTime: false, updateType: UpdateType.Update);
             _feedback.isPaused = true;
             _feedback
                 .Group(Tween.LocalPosition(visual, _basePosition, peakPosition, halfDuration, Ease.OutQuad))
                 .Chain(Tween.LocalPosition(visual, peakPosition, _basePosition, halfDuration, Ease.InQuad))
-                .Insert(0f, Tween.Scale(visual, _baseScale, squash, options.DurationSeconds * 0.25f, Ease.OutSine))
-                .Insert(options.DurationSeconds * 0.25f, Tween.Scale(visual, squash, stretch, options.DurationSeconds * 0.25f, Ease.InOutSine))
+                .Insert(0f, Tween.Scale(visual, _baseScale, squash, durationSeconds * 0.25f, Ease.OutSine))
+                .Insert(durationSeconds * 0.25f, Tween.Scale(visual, squash, stretch, durationSeconds * 0.25f, Ease.InOutSine))
                 .Insert(halfDuration, Tween.Scale(visual, stretch, _baseScale, halfDuration, Ease.OutSine))
                 .OnComplete(this, animator => animator.RestorePose());
         }

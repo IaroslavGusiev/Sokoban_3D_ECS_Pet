@@ -9,19 +9,16 @@ namespace Sokoban.Presentation
         public IViewProvider Provider { get; }
         public CancellationToken Token { get; }
         public float MoveDurationSeconds { get; }
-        public BoxGoalFeedbackOptions GoalFeedback { get; }
 
         public ViewContext(
             Transform root, 
             IViewProvider provider, 
             CancellationToken token,
-            float moveDurationSeconds,
-            BoxGoalFeedbackOptions goalFeedback = default)
+            float moveDurationSeconds)
         {
             Root = root;
             Token = token;
             Provider = provider;
-            GoalFeedback = goalFeedback;
             MoveDurationSeconds = moveDurationSeconds;
         }
     }

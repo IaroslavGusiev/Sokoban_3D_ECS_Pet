@@ -299,8 +299,7 @@ namespace Sokoban.Presentation
             try
             {
                 GameplaySettings settings = _staticData.GetGameplaySettings();
-                var feedback = new BoxGoalFeedbackOptions(settings.BoxGoalBumpDurationSeconds, settings.BoxGoalBumpHeight, settings.BoxGoalSquashAmount);
-                _run = _runFactory.Create(_level, new RunOptions(_playerSkin, settings.LevelTimeLimitSeconds, settings.MoveDurationSeconds, feedback));
+                _run = _runFactory.Create(_level, new RunOptions(_playerSkin, settings.LevelTimeLimitSeconds, settings.MoveDurationSeconds));
             }
             catch (Exception exception)
             {

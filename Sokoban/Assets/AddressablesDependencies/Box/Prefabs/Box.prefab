@@ -91,6 +91,9 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   visual: {fileID: 1686881325863600557}
+  durationSeconds: 0.22
+  height: 0.12
+  squashAmount: 0.12
 --- !u!1 &7628867827952849558
 GameObject:
   m_ObjectHideFlags: 0

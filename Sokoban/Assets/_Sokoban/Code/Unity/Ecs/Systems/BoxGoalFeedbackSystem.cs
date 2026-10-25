@@ -11,7 +11,6 @@ namespace Sokoban.Presentation.Ecs.Systems
     public sealed class BoxGoalFeedbackSystem : ISystem<float>
     {
         private readonly World _world;
-        private readonly BoxGoalFeedbackOptions _options;
 
         private readonly List<Entity> _consumed = new();
         private readonly List<BoxEnteredGoal> _messages = new();
@@ -21,10 +20,9 @@ namespace Sokoban.Presentation.Ecs.Systems
         
         public bool IsEnabled { get; set; } = true;
 
-        public BoxGoalFeedbackSystem(World world, BoxGoalFeedbackOptions options)
+        public BoxGoalFeedbackSystem(World world)
         {
             _world = world;
-            _options = options;
             
             _subscription = world.Subscribe<BoxEnteredGoal>(OnBoxEnteredGoal);
         }
@@ -83,7 +81,7 @@ namespace Sokoban.Presentation.Ecs.Systems
             BoxGoalAnimator animator = entity.Get<BoxGoalFeedbackComponent>().Animator;
             if (animator != null)
             {
-                animator.PlayGoalFeedback(_options);
+                animator.PlayGoalFeedback();
                 if (animator.IsPlaying)
                 {
                     entity.Set(new BoxGoalFeedbackState(goal));

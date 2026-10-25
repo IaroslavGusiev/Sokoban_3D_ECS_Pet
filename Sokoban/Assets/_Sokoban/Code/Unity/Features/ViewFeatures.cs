@@ -11,7 +11,7 @@ namespace Sokoban.Presentation
             new ActorMotionFeature(context.MoveDurationSeconds), // 3
             new TransformSyncFeature(), // 4
             new PlayerAnimationFeature(), // 5
-            new BoxGoalFeedbackFeature(context.GoalFeedback), // 6
+            new BoxGoalFeedbackFeature(), // 6
         };
     }
 }

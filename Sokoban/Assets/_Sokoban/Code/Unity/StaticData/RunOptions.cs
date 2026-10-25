@@ -5,14 +5,12 @@ namespace Sokoban.Presentation
         public SkinId Skin { get; }
         public float TimeLimitSeconds { get; }
         public float MoveDurationSeconds { get; }
-        public BoxGoalFeedbackOptions GoalFeedback { get; }
 
-        public RunOptions(SkinId skin, float timeLimitSeconds, float moveDurationSeconds, BoxGoalFeedbackOptions goalFeedback = default)
+        public RunOptions(SkinId skin, float timeLimitSeconds, float moveDurationSeconds)
         {
             Skin = skin;
             TimeLimitSeconds = timeLimitSeconds;
             MoveDurationSeconds = moveDurationSeconds;
-            GoalFeedback = goalFeedback;
         }
     }
 }
