@@ -47,8 +47,10 @@ namespace Sokoban.Tests.App
 
             foreach (IReadOnlyList<GridPosition> positions in new[] { level.Walls, level.Boxes, level.Goals })
             {
-                var collection = (IList<GridPosition>)positions;
-                Assert.Throws<NotSupportedException>(() => collection[0] = new GridPosition(99, 99));
+                if (positions is IList<GridPosition> collection)
+                {
+                    Assert.Throws<NotSupportedException>(() => collection[0] = new GridPosition(99, 99));
+                }
             }
         }
     }

@@ -2,9 +2,11 @@
 
 Reference inventory; use [architecture](ARCHITECTURE.md) for current boundaries and [setup](SETUP.md) for verification steps. Inventory dates below describe snapshots, not a fresh compile/test result.
 
-Source inventory updated on 2026-10-23 for string-address validation; the resolved-package inventory remains the 2026-10-22 snapshot. Assembly names are read from the JSON name field, not inferred from filenames. Library entries are generated package-cache inputs, listed separately from source/vendored files.
+Source inventory updated on 2026-10-24 for public actor-motion tests; the resolved-package inventory remains the 2026-10-22 snapshot. Assembly names are read from the JSON name field, not inferred from filenames. Library entries are generated package-cache inputs, listed separately from source/vendored files.
 
 Friendship audit after ECS-driven view binding: Core keeps Sokoban.EditModeTests (internal movement systems) and Sokoban.App.EditModeTests (internal Simulation constructor and MovementFeature). Sokoban.PlayModeTests exists but no longer uses Core internals, so its friend entry was removed. No nonexistent friend entries were present. String-address migration adds Sokoban.Editor and Sokoban.Editor.Tests, both Editor-only; existing assemblies and Core friendship are unchanged.
+
+Sokoban.Editor.Tests now also contains public actor-motion/projection tests. Its references include Sokoban.Core and Sokoban.Unity, with overrideReferences enabled and explicit DefaultEcs.dll/nunit.framework.dll references. Existing Core friend declarations are unchanged; no asmdef was added.
 
 ## Source and vendored asmdefs (22)
 
@@ -233,6 +235,6 @@ Friendship audit after ECS-driven view binding: Core keeps Sokoban.EditModeTests
 
 ## Core friend audit
 
-The existing entries Sokoban.EditModeTests, Sokoban.App.EditModeTests, and Sokoban.PlayModeTests all match existing asmdefs. The App name is historical but still real. Zero entries were removed; none were added. Sokoban.Core.Tests uses only public Core APIs.
+Core grants friendship to Sokoban.EditModeTests and Sokoban.App.EditModeTests only. The historical App assembly is still real. Sokoban.PlayModeTests uses public Core APIs and has no Core friendship; Sokoban.Core.Tests also uses only public Core APIs. Core folder moves and goal-message support add no assembly definitions. Sokoban.Unity continues to friend Sokoban.PlayModeTests for application construction and full deterministic controller ticks.
 
 The source namespace is now Sokoban.Presentation, while the assembly name and file/folder names remain Sokoban.Unity. The rootNamespace field was updated without renaming the assembly.

@@ -1,17 +1,19 @@
 using System;
 using DefaultEcs;
 using UnityEngine;
+using System.Linq;
+using System.Collections.Generic;
 
 namespace Sokoban.Presentation.Ecs.Model
 {
     [DisallowMultipleComponent]
     public sealed class EntityView : MonoBehaviour
     {
-        [SerializeField] private EntityAdapter[] _adapters = Array.Empty<EntityAdapter>();
+        [SerializeField] private List<EntityAdapter> adapters;
 
         public void Install(Entity entity)
         {
-            foreach (EntityAdapter adapter in _adapters)
+            foreach (EntityAdapter adapter in adapters)
             {
                 if (adapter == null)
                 {
@@ -22,12 +24,18 @@ namespace Sokoban.Presentation.Ecs.Model
             }
         }
 
-        private void Reset() => 
-            _adapters = GetComponents<EntityAdapter>();
-
         public void Uninstall(Entity entity)
         {
-            foreach (EntityAdapter adapter in _adapters) adapter.Uninstall(entity);
+            foreach (EntityAdapter adapter in adapters)
+            {
+                adapter.Uninstall(entity);
+            }
+        }
+
+        private void Reset()
+        {
+            adapters = GetComponents<EntityAdapter>()
+                .ToList();
         }
     }
 }

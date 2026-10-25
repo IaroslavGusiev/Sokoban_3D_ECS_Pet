@@ -25,7 +25,24 @@ namespace Sokoban.Presentation.Ecs.Systems
                 return;
             }
 
-            transform.position = GridCoordinates.ToWorld(entity.Get<GridPosition>());
+            Vector3 target = entity.Has<ViewMove>()
+                ? entity.Get<ViewMove>().Position
+                : GridCoordinates.ToWorld(entity.Get<GridPosition>());
+            
+            if (transform.position != target)
+            {
+                transform.position = target;
+            }
+
+            if (entity.Has<PlayerTag>() && entity.Has<ActorViewState>())
+            {
+                var state = entity.Get<ActorViewState>();
+                
+                if (state.HasFacing && transform.rotation != state.Facing)
+                {
+                    transform.rotation = state.Facing;
+                }
+            }
         }
     }
 }

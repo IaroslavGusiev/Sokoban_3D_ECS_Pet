@@ -24,7 +24,7 @@ namespace Sokoban.CoreTests
             IReadOnlyList<MoveCommand> moves = solution.Moves;
             TestContext.WriteLine($"{Path.GetFileName(path)}: shortest solution = {moves.Count} moves.");
 
-            using var simulation = new Simulation(level);
+            using var simulation = new Simulation(level, new LevelPopulator(), 60f);
             Assert.That(simulation.IsCompleted, Is.False);
             Entity player = simulation.World.Single(entity => entity.Has<PlayerTag>());
             for (int index = 0; index < moves.Count; index++)
@@ -42,6 +42,7 @@ namespace Sokoban.CoreTests
 
             Assert.That(boxes, Is.EquivalentTo(level.Goals));
             Assert.That(simulation.IsCompleted, Is.True);
+            Assert.That(simulation.Result.Moves, Is.EqualTo(moves.Count));
         }
     }
 }

@@ -157,7 +157,7 @@ namespace Sokoban.Tests.PlayMode
             }
             GameObject parent = CreateObject("Flow root");
             parent.transform.position = new Vector3(10, 4, -5);
-            var layer = new ViewLayer(new LevelRoot(parent.transform), world, provider, new ViewFeatures());
+            var layer = new ViewLayer(new LevelRoot(parent.transform), world, provider, new ViewFeatures(), new RunOptions(SkinId.Default, 60f, 0.16f));
             _layers.Add(layer);
             return (layer, entities.ToArray(), parent.transform.GetChild(0));
         }
@@ -167,11 +167,11 @@ namespace Sokoban.Tests.PlayMode
         {
             GameObject normal = CreateSkinPrefab("Default skin");
             var adapter = normal.AddComponent<TestSkinAdapter>();
-            typeof(ComponentAdapter<TestSkinMarker>).GetField("_value", BindingFlags.Instance | BindingFlags.NonPublic)
+            typeof(ComponentAdapter<TestSkinMarker>).GetField("Value", BindingFlags.Instance | BindingFlags.NonPublic)
                 .SetValue(adapter, new TestSkinMarker { Value = 7 });
             var view = normal.AddComponent<EntityView>();
-            typeof(EntityView).GetField("_adapters", BindingFlags.Instance | BindingFlags.NonPublic)
-                .SetValue(view, new EntityAdapter[] { adapter });
+            typeof(EntityView).GetField("adapters", BindingFlags.Instance | BindingFlags.NonPublic)
+                .SetValue(view, new List<EntityAdapter> { adapter });
             GameObject alternate = CreateSkinPrefab("Alternate skin");
             var provider = new FakeViewProvider(key => key.Skin == SkinId.Default ? normal : alternate);
             var fixture = CreateLayer(provider, false);
@@ -286,9 +286,9 @@ namespace Sokoban.Tests.PlayMode
         {
             GameObject prefab = CreateSkinPrefab("Skin");
             var level = Sokoban.Core.LevelParser.Parse("#####\n#@$.#\n#####");
-            using var simulation = new Sokoban.Core.Simulation(level);
+            using var simulation = new Sokoban.Core.Simulation(level, new Sokoban.Core.LevelPopulator(), 60f);
             using var layer = new ViewLayer(new LevelRoot(CreateObject("Simulation root").transform), simulation.World,
-                new FakeViewProvider(_ => prefab), new ViewFeatures());
+                new FakeViewProvider(_ => prefab), new ViewFeatures(), new RunOptions(SkinId.Default, 60f, 0.16f));
             var before = new Dictionary<Entity, GridPosition>();
             foreach (Entity entity in simulation.World) before.Add(entity, entity.Get<GridPosition>());
             layer.Tick(0f);

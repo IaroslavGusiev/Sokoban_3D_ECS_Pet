@@ -7,7 +7,12 @@ namespace Sokoban.Presentation
         public override void InstallBindings()
         {
             Container
-                .BindInterfacesAndSelfTo<GameplayController>()
+                .Bind(typeof(GameplayController), typeof(IInitializable), typeof(ITickable), typeof(IGameplayStatus), typeof(IGameplayCommands))
+                .To<GameplayController>()
+                .AsSingle();
+
+            Container
+                .BindInterfacesAndSelfTo<GameplayLifetime>()
                 .AsSingle();
         }
     }

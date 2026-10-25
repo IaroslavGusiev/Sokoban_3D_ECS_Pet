@@ -1,6 +1,6 @@
-using Sokoban.Presentation.Ecs.Components;
-using Sokoban.Presentation.Ecs.Model;
 using UnityEngine;
+using Sokoban.Presentation.Ecs.Model;
+using Sokoban.Presentation.Ecs.Components;
 
 namespace Sokoban.Presentation.Ecs.Adapters
 {
@@ -8,6 +8,6 @@ namespace Sokoban.Presentation.Ecs.Adapters
     public sealed class TransformAdapter : ComponentAdapter<TransformComponent>
     {
         private void Reset() => 
-            _value = new TransformComponent(transform);
+            Value = new TransformComponent(transform);
     }
 }

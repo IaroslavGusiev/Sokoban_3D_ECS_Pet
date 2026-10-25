@@ -1,7 +1,9 @@
 {
     "name": "Sokoban.Editor.Tests",
     "rootNamespace": "Sokoban.Tests.Editor",
-    "references": ["Sokoban.Editor", "Sokoban.Unity", "Unity.Addressables.Editor"],
+    "references": ["Sokoban.Editor", "Sokoban.Unity", "Sokoban.Core", "Unity.Addressables.Editor"],
     "includePlatforms": ["Editor"],
+    "overrideReferences": true,
+    "precompiledReferences": ["DefaultEcs.dll", "nunit.framework.dll"],
     "optionalUnityReferences": ["TestAssemblies"]
 }

@@ -19,11 +19,11 @@ namespace Sokoban.Editor
             if (settings == null) throw new InvalidOperationException("Create Addressables settings before validating addresses.");
             var entries = new List<AddressableAssetEntry>();
             settings.GetAllAssets(entries, false);
+            ValidateConfigs(entries);
             foreach (string guid in AssetDatabase.FindAssets("t:ViewCatalog"))
             {
                 string path = AssetDatabase.GUIDToAssetPath(guid);
                 ViewCatalog catalog = AssetDatabase.LoadAssetAtPath<ViewCatalog>(path);
-                catalog.Validate();
                 foreach (ViewCatalog.KindEntry kind in catalog.Entries)
                 foreach (ViewCatalog.SkinEntry skin in kind.Skins)
                 {
@@ -34,10 +34,9 @@ namespace Sokoban.Editor
             {
                 string path = AssetDatabase.GUIDToAssetPath(guid);
                 LevelList levels = AssetDatabase.LoadAssetAtPath<LevelList>(path);
-                levels.Validate();
                 for (int index = 0; index < levels.Count; index++)
                 {
-                    ValidateAddress(levels.Levels[index], typeof(TextAsset), entries, $"{path}: level {index}");
+                    ValidateAddress(levels.Levels[index].Address, typeof(TextAsset), entries, $"{path}: level {index}");
                 }
             }
         }
@@ -60,6 +59,23 @@ namespace Sokoban.Editor
             if (!match.parentGroup.IncludeInBuild || schema != null && !schema.IncludeAddressInCatalog)
             {
                 throw new InvalidOperationException($"{context}: address '{address}' is excluded from the build or its catalog addresses are disabled.");
+            }
+        }
+
+        public static void ValidateConfigs(IEnumerable<AddressableAssetEntry> entries)
+        {
+            AddressableAssetEntry[] all = entries.ToArray();
+            foreach (Type type in new[] { typeof(GameplaySettings), typeof(LevelList), typeof(ViewCatalog) })
+            {
+                AddressableAssetEntry[] matches = all.Where(entry => entry.labels.Contains(StaticDataProvider.ConfigLabel)
+                    && type.IsAssignableFrom(AssetDatabase.GetMainAssetTypeAtPath(entry.AssetPath))).ToArray();
+                if (matches.Length != 1)
+                    throw new InvalidOperationException($"Label '{StaticDataProvider.ConfigLabel}' must contain exactly one {type.Name}; found {matches.Length}.");
+                AddressableAssetEntry match = matches[0];
+                ValidateAddress(match.address, type, all, StaticDataProvider.ConfigLabel);
+                BundledAssetGroupSchema schema = match.parentGroup.GetSchema<BundledAssetGroupSchema>();
+                if (schema != null && !schema.IncludeLabelsInCatalog)
+                    throw new InvalidOperationException($"{match.address}: config labels are excluded from the catalog.");
             }
         }
     }

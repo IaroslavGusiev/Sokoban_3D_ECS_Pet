@@ -3,6 +3,7 @@
     "rootNamespace": "Sokoban.Tests.PlayMode",
     "references": [
         "Sokoban.Unity",
+        "PrimeTween.Runtime",
         "Sokoban.Core",
         "Unity.InputSystem",
         "Zenject",

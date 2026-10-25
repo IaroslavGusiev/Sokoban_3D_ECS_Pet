@@ -6,6 +6,7 @@ For implementation use [current architecture](../ARCHITECTURE.md); for running a
 
 | Record | Scope |
 | --- | --- |
+| [Level results and finish](LEVEL-RESULTS-FINISH.md) | Animation cleanup, Core move/time results, public gameplay status, finish/replay, guard audit, and manual overlay setup. |
 | [Early architecture](iterations/ARCHITECTURE-HISTORY.md) | Working design before the layer readability refactor. |
 | [Movement example](iterations/iteration-1/MovementSystem.EntitySet.cs.txt) | Earlier EntitySet implementation sample, not compiled runtime code. |
 | [Unity tooling setup](UNITY-TOOLING-SETUP.md) | Original machine-specific connection verification. |

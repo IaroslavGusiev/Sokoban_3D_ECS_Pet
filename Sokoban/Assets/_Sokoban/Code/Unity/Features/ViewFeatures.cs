@@ -8,7 +8,10 @@ namespace Sokoban.Presentation
         {
             new SkinSwitchFeature(), // 1
             new ViewBindingFeature(context), // 2
-            new TransformSyncFeature(), // 3
+            new ActorMotionFeature(context.MoveDurationSeconds), // 3
+            new TransformSyncFeature(), // 4
+            new PlayerAnimationFeature(), // 5
+            new BoxGoalFeedbackFeature(context.GoalFeedback), // 6
         };
     }
 }

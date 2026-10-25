@@ -52,7 +52,7 @@ namespace Sokoban.Tests.PlayMode
             player.Set(new GridPosition(1, 2));
             Entity ignored = world.CreateEntity();
             ignored.Set(new GridPosition(4, 4));
-            using var binding = new ViewBindingSystem(world, new ViewContext(root, provider, cancellation.Token));
+            using var binding = new ViewBindingSystem(world, new ViewContext(root, provider, cancellation.Token, 0.16f));
             for (int i = 0; i < 5; i++) binding.Update(1f);
             Assert.That(provider.Calls, Is.EqualTo(1));
             Assert.That(player.Has<ViewPending>(), Is.True);
@@ -81,7 +81,7 @@ namespace Sokoban.Tests.PlayMode
             entity.Set(new GridPosition(2, 3));
             var provider = new PendingProvider();
             Transform root = CreateObject("Level root").transform;
-            var layer = new ViewLayer(new LevelRoot(root), world, provider, new ViewFeatures());
+            var layer = new ViewLayer(new LevelRoot(root), world, provider, new ViewFeatures(), new RunOptions(SkinId.Default, 60f, 0.16f));
             layer.Tick(0f);
             Assert.That(entity.Has<ViewPending>(), Is.True);
             layer.Dispose();
@@ -102,16 +102,16 @@ namespace Sokoban.Tests.PlayMode
             Transform root = CreateObject("Root").transform;
             GameObject prefab = CreateObject("Adapter prefab");
             var adapter = prefab.AddComponent<TransformAdapter>();
-            typeof(ComponentAdapter<TransformComponent>).GetField("_value", BindingFlags.Instance | BindingFlags.NonPublic)
+            typeof(ComponentAdapter<TransformComponent>).GetField("Value", BindingFlags.Instance | BindingFlags.NonPublic)
                 .SetValue(adapter, default(TransformComponent));
             var entityView = prefab.AddComponent<EntityView>();
-            typeof(EntityView).GetField("_adapters", BindingFlags.Instance | BindingFlags.NonPublic)
-                .SetValue(entityView, new EntityAdapter[] { adapter });
+            typeof(EntityView).GetField("adapters", BindingFlags.Instance | BindingFlags.NonPublic)
+                .SetValue(entityView, new List<EntityAdapter> { adapter });
             Entity entity = world.CreateEntity();
             entity.Set<FloorTag>();
             entity.Set<GoalTag>();
             entity.Set(new GridPosition(2, 4));
-            using var binding = new ViewBindingSystem(world, new ViewContext(root, provider, cancellation.Token));
+            using var binding = new ViewBindingSystem(world, new ViewContext(root, provider, cancellation.Token, 0.16f));
             binding.Update(0f);
             Assert.That(provider.Kind, Is.EqualTo(ViewKind.Goal));
             provider.Complete(prefab);
@@ -150,13 +150,14 @@ namespace Sokoban.Tests.PlayMode
         [UnityTest]
         public IEnumerator MissingSkin_ResolvesDefaultAndSharesOneCachedHandle() => UniTask.ToCoroutine(async () =>
         {
-            var catalog = UnityEngine.Object.Instantiate(UnityEditor.AssetDatabase.LoadAssetAtPath<ViewCatalog>("Assets/_Sokoban/Resources/LevelViewCatalog.asset"));
-            typeof(ViewCatalog).GetField("entries", BindingFlags.Instance | BindingFlags.NonPublic)
+            var catalog = UnityEngine.Object.Instantiate(UnityEditor.AssetDatabase.LoadAssetAtPath<ViewCatalog>("Assets/Addressables/Config/LevelViewCatalog.asset"));
+            typeof(ViewCatalog).GetField("<Entries>k__BackingField", BindingFlags.Instance | BindingFlags.NonPublic)
                 .SetValue(catalog, catalog.Entries.Select(entry => new ViewCatalog.KindEntry
                 {
-                    Kind = entry.Kind, Skins = entry.Skins.Where(skin => skin.Skin == SkinId.Default).ToArray()
-                }).ToArray());
-            using var assets = new ViewAssets(catalog);
+                    Kind = entry.Kind, Skins = entry.Skins.Where(skin => skin.Skin == SkinId.Default).ToList()
+                }).ToList());
+            var service = new TestAddressablesService();
+            using var assets = new ViewAssets(new TestStaticData { Views = catalog }, service);
             try
             {
                 var alternate = new ViewKey(ViewKind.Player, SkinId.Alternate);
@@ -166,10 +167,8 @@ namespace Sokoban.Tests.PlayMode
                 UniTask<GameObject> second = assets.LoadAsync(normal, CancellationToken.None);
                 Assert.That(await first, Is.SameAs(await second));
                 await UniTask.NextFrame();
-                var handles = Handles(assets);
-                Assert.That(handles.Count, Is.EqualTo(1));
-                Assert.That(handles.ContainsKey(normal), Is.True);
-                Assert.That(handles[normal].ReferenceCount, Is.EqualTo(1));
+                Assert.That(service.LoadedAddresses, Is.EqualTo(new[] { catalog.Resolve(normal).Address }));
+                Assert.That(service.LoadHandles.Single().ReferenceCount, Is.EqualTo(1));
                 LogAssert.NoUnexpectedReceived();
             }
             finally
@@ -179,14 +178,14 @@ namespace Sokoban.Tests.PlayMode
         });
 
         [Test]
-        public void Catalog_ValidatesGroupedSkinsAndResolvesExactBeforeDefault()
+        public void Catalog_RoundTripsGroupedSkinsAndResolvesExactBeforeDefault()
         {
             var catalog = ScriptableObject.CreateInstance<ViewCatalog>();
             try
             {
                 var entries = Enum.GetValues(typeof(ViewKind)).Cast<ViewKind>().Select(kind => new ViewCatalog.KindEntry
                 {
-                    Kind = kind, Skins = new[] { new ViewCatalog.SkinEntry
+                    Kind = kind, Skins = new List<ViewCatalog.SkinEntry> { new ViewCatalog.SkinEntry
                     {
                         Skin = SkinId.Default, Address = $"views/{kind.ToString().ToLowerInvariant()}"
                     } }
@@ -197,18 +196,16 @@ namespace Sokoban.Tests.PlayMode
                 {
                     Skin = SkinId.Alternate, Address = "views/player_alt"
                 };
-                player.Skins = new[] { normal, alternate };
-                FieldInfo field = typeof(ViewCatalog).GetField("entries", BindingFlags.Instance | BindingFlags.NonPublic);
-                field.SetValue(catalog, entries.ToArray());
-                Assert.DoesNotThrow(catalog.Validate);
+                player.Skins = new List<ViewCatalog.SkinEntry> { normal, alternate };
+                FieldInfo field = typeof(ViewCatalog).GetField("<Entries>k__BackingField", BindingFlags.Instance | BindingFlags.NonPublic);
+                field.SetValue(catalog, entries);
                 Assert.That(catalog.Resolve(new ViewKey(ViewKind.Player, SkinId.Alternate)), Is.SameAs(alternate));
                 var restored = ScriptableObject.CreateInstance<ViewCatalog>();
                 try
                 {
                     UnityEditor.EditorJsonUtility.FromJsonOverwrite(UnityEditor.EditorJsonUtility.ToJson(catalog), restored);
-                    Assert.DoesNotThrow(restored.Validate);
                     Assert.That(restored.Entries.Count, Is.EqualTo(entries.Count));
-                    Assert.That(restored.Entries.Single(entry => entry.Kind == ViewKind.Player).Skins.Length, Is.EqualTo(2));
+                    Assert.That(restored.Entries.Single(entry => entry.Kind == ViewKind.Player).Skins.Count, Is.EqualTo(2));
                     Assert.That(restored.Resolve(new ViewKey(ViewKind.Player, SkinId.Alternate)).Address,
                         Is.EqualTo(alternate.Address));
                     Assert.That(restored.Resolve(new ViewKey(ViewKind.Player, SkinId.Default)).Address,
@@ -218,16 +215,6 @@ namespace Sokoban.Tests.PlayMode
                 finally
                 {
                     UnityEngine.Object.DestroyImmediate(restored);
-                }
-                player.Skins = new[] { normal, alternate, alternate };
-                Assert.That(Assert.Throws<InvalidOperationException>(catalog.Validate).Message, Does.Contain("Player/Alternate: duplicated"));
-                player.Skins = new[] { alternate };
-                Assert.That(Assert.Throws<InvalidOperationException>(catalog.Validate).Message, Does.Contain("Player: missing Default"));
-                player.Skins = new[] { normal, alternate };
-                foreach (string invalid in new[] { null, "", " \t" })
-                {
-                    alternate.Address = invalid;
-                    Assert.That(Assert.Throws<InvalidOperationException>(catalog.Validate).Message, Does.Contain("Player/Alternate: empty address"));
                 }
             }
             finally
@@ -240,7 +227,10 @@ namespace Sokoban.Tests.PlayMode
         public IEnumerator SynchronousCatalogFailure_LogsOnceWithoutCachingAHandle() => UniTask.ToCoroutine(async () =>
         {
             var catalog = ScriptableObject.CreateInstance<ViewCatalog>();
-            using var assets = new ViewAssets(catalog);
+            typeof(ViewCatalog).GetField("<Entries>k__BackingField", BindingFlags.Instance | BindingFlags.NonPublic)
+                .SetValue(catalog, new List<ViewCatalog.KindEntry>());
+            var service = new TestAddressablesService();
+            using var assets = new ViewAssets(new TestStaticData { Views = catalog }, service);
             try
             {
                 LogAssert.Expect(LogType.Exception, new Regex("InvalidOperationException"));
@@ -254,7 +244,7 @@ namespace Sokoban.Tests.PlayMode
                     failed = true;
                 }
                 Assert.That(failed, Is.True);
-                Assert.That(Handles(assets), Is.Empty);
+                Assert.That(service.LoadHandles, Is.Empty);
                 LogAssert.NoUnexpectedReceived();
             }
             finally
@@ -267,26 +257,21 @@ namespace Sokoban.Tests.PlayMode
         public IEnumerator SharedFailure_LogsOnceForCompletionAndAllWaitingCallers() => UniTask.ToCoroutine(async () =>
         {
             var catalog = ScriptableObject.CreateInstance<ViewCatalog>();
-            typeof(ViewCatalog).GetField("entries", BindingFlags.Instance | BindingFlags.NonPublic).SetValue(catalog,
-                new[] { new ViewCatalog.KindEntry { Kind = ViewKind.Floor, Skins = new[]
+            typeof(ViewCatalog).GetField("<Entries>k__BackingField", BindingFlags.Instance | BindingFlags.NonPublic).SetValue(catalog,
+                new List<ViewCatalog.KindEntry> { new ViewCatalog.KindEntry { Kind = ViewKind.Floor, Skins = new List<ViewCatalog.SkinEntry>
                 {
                     new ViewCatalog.SkinEntry { Skin = SkinId.Default, Address = Guid.NewGuid().ToString("N") }
                 } } });
-            using var assets = new ViewAssets(catalog);
-            var operation = new FailedOperation();
+            var operation = new TestOperation<GameObject>();
             AsyncOperationHandle<GameObject> handle = Addressables.ResourceManager.StartOperation(operation, default);
-            Type entryType = typeof(ViewAssets).GetNestedType("CachedLoad", BindingFlags.NonPublic);
-            object entry = Activator.CreateInstance(entryType, new object[] { handle });
-            var cache = (IDictionary)typeof(ViewAssets).GetField("_handles", BindingFlags.Instance | BindingFlags.NonPublic).GetValue(assets);
-            cache.Add(new ViewKey(ViewKind.Floor, SkinId.Default), entry);
-            handle.Completed += (Action<AsyncOperationHandle<GameObject>>)Delegate.CreateDelegate(
-                typeof(Action<AsyncOperationHandle<GameObject>>), entry, "OnCompleted");
+            var service = new TestAddressablesService(load: (_, _) => handle);
+            using var assets = new ViewAssets(new TestStaticData { Views = catalog }, service);
             try
             {
                 UniTask<GameObject> first = assets.LoadAsync(new ViewKey(ViewKind.Floor, SkinId.Default), CancellationToken.None);
                 UniTask<GameObject> second = assets.LoadAsync(new ViewKey(ViewKind.Floor, SkinId.Default), CancellationToken.None);
                 LogAssert.Expect(LogType.Exception, new Regex("InvalidOperationException: planned shared failure"));
-                operation.Fail();
+                operation.Fail(new InvalidOperationException("planned shared failure"));
                 int failures = 0;
                 foreach (UniTask<GameObject> task in new[] { first, second })
                 {
@@ -300,6 +285,8 @@ namespace Sokoban.Tests.PlayMode
                     }
                 }
                 Assert.That(failures, Is.EqualTo(2));
+                Assert.That(service.LoadHandles.Count, Is.EqualTo(1));
+                Assert.That(service.ReleaseCalls, Is.Zero);
                 await UniTask.NextFrame(cancellationToken: CancellationToken.None);
                 LogAssert.NoUnexpectedReceived();
             }
@@ -312,8 +299,11 @@ namespace Sokoban.Tests.PlayMode
         [UnityTest]
         public IEnumerator SharedLoad_CallerCancellationDoesNotCancelOrReleaseTheHandle() => UniTask.ToCoroutine(async () =>
         {
-            var catalog = UnityEditor.AssetDatabase.LoadAssetAtPath<ViewCatalog>("Assets/_Sokoban/Resources/LevelViewCatalog.asset");
-            var assets = new ViewAssets(catalog);
+            var catalog = UnityEditor.AssetDatabase.LoadAssetAtPath<ViewCatalog>("Assets/Addressables/Config/LevelViewCatalog.asset");
+            var operation = new TestOperation<GameObject>();
+            var handle = Addressables.ResourceManager.StartOperation(operation, default);
+            var service = new TestAddressablesService(load: (_, _) => handle);
+            var assets = new ViewAssets(new TestStaticData { Views = catalog }, service);
             using var cancellation = new CancellationTokenSource();
             try
             {
@@ -321,30 +311,34 @@ namespace Sokoban.Tests.PlayMode
                 UniTask<GameObject> remaining = assets.LoadAsync(new ViewKey(ViewKind.Floor, SkinId.Default), CancellationToken.None);
                 cancellation.Cancel();
                 Assert.That(await cancelled.SuppressCancellationThrow(), Is.EqualTo((true, (GameObject)null)));
+                Assert.That(service.ReleaseCalls, Is.Zero);
+                operation.Finish(CreateObject("Shared prefab"));
                 GameObject prefab = await remaining;
                 GameObject repeated = await assets.LoadAsync(new ViewKey(ViewKind.Floor, SkinId.Default), CancellationToken.None);
                 await UniTask.NextFrame(cancellationToken: CancellationToken.None);
                 Assert.That(prefab, Is.SameAs(repeated));
-                var handles = Handles(assets);
-                Assert.That(handles.Count, Is.EqualTo(1));
-                Assert.That(handles[new ViewKey(ViewKind.Floor, SkinId.Default)].IsValid(), Is.True);
-                Assert.That(handles[new ViewKey(ViewKind.Floor, SkinId.Default)].ReferenceCount, Is.EqualTo(1));
+                Assert.That(service.LoadHandles.Count, Is.EqualTo(1));
+                Assert.That(handle.IsValid(), Is.True);
+                Assert.That(handle.ReferenceCount, Is.EqualTo(1));
             }
             finally
             {
                 assets.Dispose();
             }
+            Assert.That(service.ReleaseCalls, Is.EqualTo(1));
+            Assert.That(operation.DestroyCalls, Is.EqualTo(1));
         });
 
         [UnityTest]
         public IEnumerator FailedKind_LogsOnceAndRetriesAfterCatalogCorrection()
         {
-            ViewCatalog catalog = UnityEngine.Object.Instantiate(UnityEditor.AssetDatabase.LoadAssetAtPath<ViewCatalog>("Assets/_Sokoban/Resources/LevelViewCatalog.asset"));
+            ViewCatalog catalog = UnityEngine.Object.Instantiate(UnityEditor.AssetDatabase.LoadAssetAtPath<ViewCatalog>("Assets/Addressables/Config/LevelViewCatalog.asset"));
             ViewCatalog.SkinEntry floorSkin = catalog.Entries.Single(entry => entry.Kind == ViewKind.Floor)
                 .Skins.Single(skin => skin.Skin == SkinId.Default);
             string original = floorSkin.Address;
             floorSkin.Address = "missing/view";
-            using var assets = new ViewAssets(catalog);
+            var service = new TestAddressablesService();
+            using var assets = new ViewAssets(new TestStaticData { Views = catalog }, service);
             try
             {
                 LogAssert.Expect(LogType.Exception, new Regex("InvalidKeyException"));
@@ -361,7 +355,7 @@ namespace Sokoban.Tests.PlayMode
                         floor.Set(new GridPosition(x, 1));
                         entities.Add(floor);
                     }
-                    using var binding = new ViewBindingSystem(world, new ViewContext(CreateObject("Root").transform, assets, cancellation.Token));
+                    using var binding = new ViewBindingSystem(world, new ViewContext(CreateObject("Root").transform, assets, cancellation.Token, 0.16f));
                     binding.Update(0f);
                     float deadline = Time.realtimeSinceStartup + 5f;
                     while (entities.Any(entity => entity.Has<ViewPending>()) && Time.realtimeSinceStartup < deadline) yield return null;
@@ -369,10 +363,10 @@ namespace Sokoban.Tests.PlayMode
                         (run == 0 ? entity.Has<ViewFailed>() && !entity.Has<TransformComponent>() :
                         !entity.Has<ViewFailed>() && entity.Has<TransformComponent>())), Is.True);
                     binding.Update(0f);
-                    Assert.That(Handles(assets).Count, Is.EqualTo(1));
+                    Assert.That(service.LoadHandles.Count, Is.EqualTo(run + 1));
                     if (run == 0)
                     {
-                        failedHandle = Handles(assets)[new ViewKey(ViewKind.Floor, SkinId.Default)];
+                        failedHandle = service.LoadHandles.Single().Convert<GameObject>();
                         floorSkin.Address = original;
                     }
                     else
@@ -394,12 +388,13 @@ namespace Sokoban.Tests.PlayMode
         [UnityTest]
         public IEnumerator SameFrameFailure_IsSharedAndRetriedOnlyAfterFrameAdvances() => UniTask.ToCoroutine(async () =>
         {
-            var catalog = UnityEngine.Object.Instantiate(UnityEditor.AssetDatabase.LoadAssetAtPath<ViewCatalog>("Assets/_Sokoban/Resources/LevelViewCatalog.asset"));
+            var catalog = UnityEngine.Object.Instantiate(UnityEditor.AssetDatabase.LoadAssetAtPath<ViewCatalog>("Assets/Addressables/Config/LevelViewCatalog.asset"));
             ViewCatalog.SkinEntry wall = catalog.Entries.Single(entry => entry.Kind == ViewKind.Wall)
                 .Skins.Single(skin => skin.Skin == SkinId.Default);
             string original = wall.Address;
             wall.Address = "missing/view";
-            using var assets = new ViewAssets(catalog);
+            var service = new TestAddressablesService();
+            using var assets = new ViewAssets(new TestStaticData { Views = catalog }, service);
             try
             {
                 await assets.LoadAsync(new ViewKey(ViewKind.Floor, SkinId.Default), CancellationToken.None);
@@ -418,12 +413,12 @@ namespace Sokoban.Tests.PlayMode
                     if (call == 0)
                     {
                         firstException = failure;
-                        failed = Handles(assets)[key];
+                        failed = service.LoadHandles.Last().Convert<GameObject>();
                     }
                     else
                     {
                         Assert.That(failure, Is.SameAs(firstException));
-                        Assert.That(Handles(assets)[key], Is.EqualTo(failed));
+                        Assert.That(service.LoadHandles.Count, Is.EqualTo(2));
                         Assert.That(failed.IsValid(), Is.True);
                     }
                 }
@@ -431,7 +426,8 @@ namespace Sokoban.Tests.PlayMode
                 await UniTask.NextFrame();
                 Assert.That(await assets.LoadAsync(key, CancellationToken.None), Is.Not.Null);
                 Assert.That(failed.IsValid(), Is.False);
-                Assert.That(Handles(assets)[key].Status, Is.EqualTo(AsyncOperationStatus.Succeeded));
+                Assert.That(service.LoadHandles.Last().Status, Is.EqualTo(AsyncOperationStatus.Succeeded));
+                Assert.That(service.ReleaseCalls, Is.EqualTo(1));
                 LogAssert.NoUnexpectedReceived();
             }
             finally
@@ -440,22 +436,6 @@ namespace Sokoban.Tests.PlayMode
             }
         });
 
-        private static Dictionary<ViewKey, AsyncOperationHandle<GameObject>> Handles(ViewAssets assets)
-        {
-            var cache = (IDictionary)typeof(ViewAssets).GetField("_handles", BindingFlags.Instance | BindingFlags.NonPublic).GetValue(assets);
-            var handles = new Dictionary<ViewKey, AsyncOperationHandle<GameObject>>();
-            foreach (DictionaryEntry entry in cache)
-            {
-                handles.Add((ViewKey)entry.Key, (AsyncOperationHandle<GameObject>)entry.Value.GetType().GetField("Handle").GetValue(entry.Value));
-            }
-            return handles;
-        }
-
-        private sealed class FailedOperation : AsyncOperationBase<GameObject>
-        {
-            protected override void Execute() { }
-            public void Fail() => Complete(null, false, new InvalidOperationException("planned shared failure"));
-        }
 #endif
 
         private GameObject CreateObject(string name)

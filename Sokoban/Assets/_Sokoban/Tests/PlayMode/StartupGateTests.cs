@@ -20,12 +20,12 @@ namespace Sokoban.Tests.PlayMode
 {
     public sealed class StartupGateTests
     {
-        private readonly List<GameObject> _objects = new();
+        private readonly List<UnityEngine.Object> _objects = new();
 
         [UnityTearDown]
         public IEnumerator TearDown()
         {
-            foreach (GameObject target in _objects)
+            foreach (UnityEngine.Object target in _objects)
             {
                 if (target != null) UnityEngine.Object.Destroy(target);
             }
@@ -43,7 +43,7 @@ namespace Sokoban.Tests.PlayMode
             Entity ignored = world.CreateEntity();
             ignored.Set(new GridPosition(3, 4));
             var provider = new Provider();
-            using var layer = new ViewLayer(new LevelRoot(CreateObject("Root").transform), world, provider, new ViewFeatures());
+            using var layer = new ViewLayer(new LevelRoot(CreateObject("Root").transform), world, provider, new ViewFeatures(), new RunOptions(SkinId.Default, 60f, 0.16f));
             Assert.That(floor.Has<ViewPending>(), Is.False);
             Assert.That(layer.Status, Is.EqualTo(ViewStatus.Binding));
             ignored.Set<ViewFailed>();
@@ -60,7 +60,7 @@ namespace Sokoban.Tests.PlayMode
         }
 
         [Test]
-        public void Binding_TicksBothLayersButDoesNotReadMovementUntilPlaying()
+        public void Binding_TicksViewsAndPreservesQueuedMovementUntilPlaying()
         {
             var provider = new Provider();
             var input = new Input { Move = MoveCommand.Left };
@@ -72,20 +72,20 @@ namespace Sokoban.Tests.PlayMode
             simulation.Send(MoveCommand.Right);
             controller.Tick();
             Assert.That(input.Reads, Is.Zero);
-            Assert.That(player.Get<GridPosition>(), Is.EqualTo(new GridPosition(3, 1)));
+            Assert.That(player.Get<GridPosition>(), Is.EqualTo(new GridPosition(2, 1)));
             Assert.That(player.Has<ViewPending>(), Is.True);
             provider.Complete(CreateObject("Prefab"));
             Transform view = player.Get<TransformComponent>().Transform;
-            Assert.That(view.position, Is.EqualTo(new Vector3(3, 0, 1)),
+            Assert.That(view.position, Is.EqualTo(new Vector3(2, 0, 1)),
                 "Binding must use the latest position before the next projection tick.");
             view.position = Vector3.one * 50;
             controller.Tick();
-            Assert.That(view.position, Is.EqualTo(new Vector3(3, 0, 1)));
+            Assert.That(view.position, Is.EqualTo(new Vector3(2, 0, 1)));
             Assert.That(StateOf(controller), Is.EqualTo("Playing"));
             Assert.That(input.Reads, Is.Zero);
             controller.Tick();
             Assert.That(input.Reads, Is.EqualTo(1));
-            Assert.That(player.Get<GridPosition>(), Is.EqualTo(new GridPosition(2, 1)));
+            Assert.That(player.Get<GridPosition>(), Is.EqualTo(new GridPosition(3, 1)));
         }
 
         [TestCase(false, false)]
@@ -164,8 +164,9 @@ namespace Sokoban.Tests.PlayMode
             controller.Tick();
             Assert.That(StateOf(controller), Is.EqualTo("Playing"));
             Assert.That(input.Reads, Is.EqualTo(reads));
-            Assert.That(player.Get<ViewSkin>().Id, Is.EqualTo(SkinId.Default));
+            Assert.That(player.Get<ViewSkin>().Id, Is.EqualTo(SkinId.Punk));
             Assert.That(player.Has<TransformComponent>(), Is.True);
+            controller.Tick(0.16f);
             controller.Tick();
             Assert.That(player.Get<GridPosition>(), Is.EqualTo(new GridPosition(2, 1)));
             Assert.That(SimulationOf(controller), Is.SameAs(simulation));
@@ -194,12 +195,14 @@ namespace Sokoban.Tests.PlayMode
             controller.Tick();
             Assert.That(StateOf(controller), Is.EqualTo("ViewsFailed"));
             Assert.That(source.Requests, Is.EqualTo(new[] { 0 }));
+            Assert.That(controller.Results, Is.Empty);
             input.NextSkinPressed = true;
             controller.Tick();
             input.NextSkinPressed = false;
             Assert.That(StateOf(controller), Is.EqualTo("Playing"));
             controller.Tick();
             Assert.That(StateOf(controller), Is.EqualTo("Completed"));
+            Assert.That(controller.Results.Count, Is.EqualTo(1));
         }
 
         [Test]
@@ -302,7 +305,7 @@ namespace Sokoban.Tests.PlayMode
             controller.Tick();
             Assert.That(StateOf(controller), Is.EqualTo("Playing"));
             Assert.That(input.Reads, Is.EqualTo(reads));
-            Assert.That(player.Get<ViewSkin>().Id, Is.EqualTo(SkinId.Default));
+            Assert.That(player.Get<ViewSkin>().Id, Is.EqualTo(SkinId.Punk));
             Assert.That(player.Has<ViewFailed>(), Is.False);
             Assert.That(player.Has<TransformComponent>(), Is.True);
             Assert.That(source.Requests, Is.EqualTo(new[] { 0 }));
@@ -331,10 +334,10 @@ namespace Sokoban.Tests.PlayMode
 
             var existingRoots = new HashSet<GameObject>(Resources.FindObjectsOfTypeAll<GameObject>()
                 .Where(target => target.name == "Level view"));
-            FieldInfo rootField = typeof(GameplayController).GetField("_root", BindingFlags.Instance | BindingFlags.NonPublic);
-            object root = rootField.GetValue(controller);
-            // Inject a construction fault without adding a production factory just for tests.
-            rootField.SetValue(controller, null);
+            object factory = typeof(GameplayController).GetField("_runFactory", BindingFlags.Instance | BindingFlags.NonPublic).GetValue(controller);
+            FieldInfo rootField = typeof(LevelRunFactory).GetField("_root", BindingFlags.Instance | BindingFlags.NonPublic);
+            object root = rootField.GetValue(factory);
+            rootField.SetValue(factory, null);
             input.RestartPressed = trigger == "restart";
             input.NextLevelPressed = trigger == "next";
             LogAssert.Expect(LogType.Exception, new Regex("NullReferenceException"));
@@ -353,7 +356,7 @@ namespace Sokoban.Tests.PlayMode
                 Assert.That(failedRoot.activeSelf, Is.False, "A failed view constructor must tear down its root.");
             Assert.DoesNotThrow(controller.Tick);
 
-            rootField.SetValue(controller, root);
+            rootField.SetValue(factory, root);
             int requestsBeforeRecovery = source.Requests.Count;
             input.RestartPressed = !recoverWithNext;
             input.NextLevelPressed = recoverWithNext;
@@ -375,7 +378,7 @@ namespace Sokoban.Tests.PlayMode
             var source = new Source { ReturnNull = true };
             var input = new Input();
             using var controller = CreateController(input, source, provider);
-            LogAssert.Expect(LogType.Exception, new Regex("ArgumentNullException"));
+            LogAssert.Expect(LogType.Exception, new Regex("NullReferenceException"));
             controller.Initialize();
             Assert.That(StateOf(controller), Is.EqualTo("LevelFailed"));
             Assert.That(SimulationOf(controller), Is.Null);
@@ -388,8 +391,307 @@ namespace Sokoban.Tests.PlayMode
             Assert.That(StateOf(controller), Is.EqualTo("Playing"));
         }
 
-        private GameplayController CreateController(Input input, Source source, Provider provider) =>
-            new(input, source, new ViewFeatures(), new LevelRoot(CreateObject("Level root").transform), provider);
+        private GameplayController CreateController(Input input, Source source, Provider provider, float timeLimitSeconds = 60f, float completionDelay = 0.75f, TestStaticData staticData = null, float moveDuration = 0.16f)
+        {
+            GameplaySettings settings = TestGameplaySettings.Create(timeLimitSeconds, completionDelay, moveDuration);
+            _objects.Add(settings);
+            var factory = new LevelRunFactory(new LevelRoot(CreateObject("Level root").transform), provider, new ViewFeatures(), new LevelPopulator());
+            staticData ??= new TestStaticData();
+            staticData.Gameplay = settings;
+            return new GameplayController(input, source, factory, staticData);
+        }
+
+        [Test]
+        public void ConfigLoading_BlocksLevelRequestsAndInputUntilReady()
+        {
+            var data = new TestStaticData { Pending = new UniTaskCompletionSource() };
+            var source = new Source();
+            var input = new Input { RestartPressed = true, NextLevelPressed = true, NextSkinPressed = true };
+            var provider = new Provider();
+            provider.Complete(CreateObject("Prefab"));
+            using var controller = CreateController(input, source, provider, staticData: data);
+            controller.Initialize();
+            controller.Tick();
+            Assert.That(StateOf(controller), Is.EqualTo("Loading"));
+            Assert.That(source.Requests, Is.Empty);
+            Assert.That(input.Reads, Is.Zero);
+            Assert.That(SimulationOf(controller), Is.Null);
+            input.RestartPressed = input.NextLevelPressed = input.NextSkinPressed = false;
+            data.Pending.TrySetResult();
+            Assert.That(StateOf(controller), Is.EqualTo("BindingViews"));
+            Assert.That(source.Requests, Is.EqualTo(new[] { 0 }));
+            Assert.That(controller.RemainingSeconds, Is.EqualTo(60f));
+        }
+
+        [Test]
+        public void ConfigLoadFailure_RestartRetriesConfigsBeforeLoadingTheLevel()
+        {
+            var data = new TestStaticData { Pending = new UniTaskCompletionSource() };
+            var source = new Source();
+            var input = new Input();
+            var provider = new Provider();
+            provider.Complete(CreateObject("Prefab"));
+            using var controller = CreateController(input, source, provider, staticData: data);
+            controller.Initialize();
+            LogAssert.Expect(LogType.Exception, new Regex("planned config failure"));
+            data.Pending.TrySetException(new InvalidOperationException("planned config failure"));
+            Assert.That(StateOf(controller), Is.EqualTo("LevelFailed"));
+            Assert.That(source.Requests, Is.Empty);
+            data.Pending = null;
+            input.RestartPressed = true;
+            controller.Tick();
+            Assert.That(StateOf(controller), Is.EqualTo("BindingViews"));
+            Assert.That(data.LoadCalls, Is.EqualTo(2));
+            Assert.That(source.Requests, Is.EqualTo(new[] { 0 }));
+        }
+
+        [Test]
+        public void DisposalDuringConfigLoad_LateCompletionCannotCreateARun()
+        {
+            var data = new TestStaticData { Pending = new UniTaskCompletionSource() };
+            var source = new Source();
+            var controller = CreateController(new Input(), source, new Provider(), staticData: data);
+            controller.Initialize();
+            controller.Dispose();
+            data.Pending.TrySetResult();
+            Assert.That(source.Requests, Is.Empty);
+            Assert.That(SimulationOf(controller), Is.Null);
+            LogAssert.NoUnexpectedReceived();
+        }
+
+        [Test]
+        public void Countdown_WaitsForViewsThenTimesOutAndRestartsWithFullBudget()
+        {
+            var provider = new Provider();
+            var source = new Source();
+            var input = new Input();
+            using var controller = CreateController(input, source, provider, 1f);
+            controller.Initialize();
+            controller.Tick(20f);
+            Assert.That(controller.RemainingSeconds, Is.EqualTo(1f));
+            Assert.That(StateOf(controller), Is.EqualTo("BindingViews"));
+            provider.Complete(CreateObject("Prefab"));
+            controller.Tick(20f);
+            Assert.That(StateOf(controller), Is.EqualTo("Playing"));
+            Assert.That(controller.RemainingSeconds, Is.EqualTo(1f));
+            Simulation previous = SimulationOf(controller);
+            bool disposed = false;
+            using var subscription = previous.World.SubscribeWorldDisposed(_ => disposed = true);
+            controller.Tick(1f);
+            Assert.That(StateOf(controller), Is.EqualTo("BindingViews"));
+            Assert.That(disposed, Is.True);
+            Assert.That(SimulationOf(controller), Is.Not.SameAs(previous));
+            Assert.That(controller.RemainingSeconds, Is.EqualTo(1f));
+            Assert.That(source.Requests, Is.EqualTo(new[] { 0 }));
+            controller.Tick(20f);
+            Assert.That(StateOf(controller), Is.EqualTo("Playing"));
+            Assert.That(controller.RemainingSeconds, Is.EqualTo(1f));
+        }
+
+        [Test]
+        public void Countdown_AutomaticRestartSuppressesSameFrameCommandsAndPreservesSkin()
+        {
+            var provider = new Provider();
+            provider.Complete(CreateObject("Prefab"));
+            var source = new Source();
+            var input = new Input();
+            using var controller = CreateController(input, source, provider, 1f);
+            controller.Initialize();
+            controller.Tick();
+            input.NextSkinPressed = true;
+            controller.Tick();
+            input.NextSkinPressed = false;
+            Simulation previous = SimulationOf(controller);
+            previous.Tick(1f);
+            input.NextLevelPressed = true;
+            input.RestartPressed = true;
+            controller.Tick();
+            Assert.That(StateOf(controller), Is.EqualTo("BindingViews"));
+            Assert.That(SimulationOf(controller), Is.Not.SameAs(previous));
+            Assert.That(controller.RemainingSeconds, Is.EqualTo(1f));
+            Assert.That(source.Requests, Is.EqualTo(new[] { 0 }));
+            var player = SimulationOf(controller).World.Single(entity => entity.Has<PlayerTag>());
+            Assert.That(player.Get<ViewSkin>().Id, Is.EqualTo(SkinId.Alternate));
+        }
+
+        [Test]
+        public void Countdown_PausesDuringViewFailureAndResumesAfterRecovery()
+        {
+            var provider = new Provider();
+            provider.Complete(CreateObject("Prefab"));
+            var source = new Source();
+            var input = new Input();
+            using var controller = CreateController(input, source, provider, 5f);
+            controller.Initialize();
+            controller.Tick(20f);
+            controller.Tick(1f);
+            Assert.That(controller.RemainingSeconds, Is.EqualTo(4f));
+            var player = SimulationOf(controller).World.Single(entity => entity.Has<PlayerTag>());
+            player.Set<ViewFailed>();
+            controller.Tick(1f);
+            Assert.That(StateOf(controller), Is.EqualTo("ViewsFailed"));
+            Assert.That(controller.RemainingSeconds, Is.EqualTo(3f));
+            controller.Tick(20f);
+            Assert.That(controller.RemainingSeconds, Is.EqualTo(3f));
+            player.Remove<ViewFailed>();
+            controller.Tick(20f);
+            Assert.That(StateOf(controller), Is.EqualTo("Playing"));
+            Assert.That(controller.RemainingSeconds, Is.EqualTo(3f));
+            controller.Tick(0.5f);
+            Assert.That(controller.RemainingSeconds, Is.EqualTo(2.5f));
+        }
+
+        [Test]
+        public void Countdown_ContinuesDuringPendingSkinRebind()
+        {
+            var provider = new Provider();
+            provider.Complete(CreateObject("Prefab"));
+            var input = new Input();
+            using var controller = CreateController(input, new Source(), provider, 5f);
+            controller.Initialize();
+            controller.Tick();
+            provider.Reset();
+            input.NextSkinPressed = true;
+            controller.Tick();
+            input.NextSkinPressed = false;
+            float before = controller.RemainingSeconds;
+            controller.Tick(1f);
+            Assert.That(StateOf(controller), Is.EqualTo("Playing"));
+            Assert.That(controller.RemainingSeconds, Is.EqualTo(before - 1f).Within(0.0001f));
+            var player = SimulationOf(controller).World.Single(entity => entity.Has<PlayerTag>());
+            Assert.That(player.Has<ViewPending>(), Is.True);
+        }
+
+        [TestCase(1f)]
+        [TestCase(5f)]
+        [TestCase(6f)]
+        public void Completion_StopsClockAndNextLevelStartsWithFullBudget(float winningDelta)
+        {
+            var provider = new Provider();
+            provider.Complete(CreateObject("Prefab"));
+            var source = new Source();
+            using var controller = CreateController(new Input(), source, provider, 5f);
+            controller.Initialize();
+            controller.Tick(20f);
+            Simulation simulation = SimulationOf(controller);
+            simulation.World.Single(entity => entity.Has<BoxTag>()).Set(new GridPosition(4, 2));
+            controller.Tick(winningDelta);
+            Assert.That(StateOf(controller), Is.EqualTo("Completed"));
+            Assert.That(controller.RemainingSeconds, Is.EqualTo(5f));
+            controller.Tick(0.5f);
+            Assert.That(controller.RemainingSeconds, Is.EqualTo(5f));
+            controller.Tick(0.25f);
+            Assert.That(source.Requests, Is.EqualTo(new[] { 0, 1 }));
+            Assert.That(StateOf(controller), Is.EqualTo("BindingViews"));
+            Assert.That(controller.RemainingSeconds, Is.EqualTo(5f));
+        }
+
+        [Test]
+        public void Completion_EachLevelWaitsForTheFullCompletionDelay()
+        {
+            var provider = new Provider();
+            provider.Complete(CreateObject("Prefab"));
+            var source = new Source();
+            using var controller = CreateController(new Input(), source, provider);
+            controller.Initialize();
+            controller.Tick(0f);
+            SimulationOf(controller).World.Single(entity => entity.Has<BoxTag>()).Set(new GridPosition(4, 2));
+            controller.Tick(0f);
+            controller.Tick(0.75f);
+            Assert.That(source.Requests, Is.EqualTo(new[] { 0, 1 }));
+
+            controller.Tick(0f);
+            SimulationOf(controller).World.Single(entity => entity.Has<BoxTag>()).Set(new GridPosition(4, 2));
+            controller.Tick(0f);
+            Assert.That(StateOf(controller), Is.EqualTo("Completed"));
+            controller.Tick(0.5f);
+            Assert.That(source.Requests, Is.EqualTo(new[] { 0, 1 }));
+            Assert.That(StateOf(controller), Is.EqualTo("Completed"));
+            controller.Tick(0.25f);
+            Assert.That(source.Requests, Is.EqualTo(new[] { 0, 1 }));
+            Assert.That(StateOf(controller), Is.EqualTo("Finished"));
+        }
+
+
+        [TestCase(0f)]
+        [TestCase(2f)]
+        public void Completion_UsesSettingsDelay(float delay)
+        {
+            var provider = new Provider();
+            provider.Complete(CreateObject("Prefab"));
+            var source = new Source();
+            using var controller = CreateController(new Input(), source, provider, 7f, delay);
+            Assert.That(controller.RemainingSeconds, Is.EqualTo(7f));
+            controller.Initialize();
+            controller.Tick(0f);
+            SimulationOf(controller).World.Single(entity => entity.Has<BoxTag>()).Set(new GridPosition(4, 2));
+            controller.Tick(0.25f);
+            Assert.That(StateOf(controller), Is.EqualTo("Completed"));
+            if (delay > 0f)
+            {
+                controller.Tick(delay - 0.25f);
+                Assert.That(source.Requests, Is.EqualTo(new[] { 0 }));
+                Assert.That(controller.RemainingSeconds, Is.EqualTo(7f));
+                controller.Tick(0.25f);
+            }
+            else controller.Tick(0f);
+            Assert.That(source.Requests, Is.EqualTo(new[] { 0, 1 }));
+            Assert.That(controller.RemainingSeconds, Is.EqualTo(7f));
+        }
+
+        [TestCase("BindingViews")]
+        [TestCase("ViewsFailed")]
+        [TestCase("Completed")]
+        [TestCase("LevelFailed")]
+        [TestCase("Finished")]
+        public void NonPlayingState_PreservesCoreStateWithoutReadingMovement(string state)
+        {
+            var provider = new Provider();
+            if (state != "BindingViews" && state != "ViewsFailed")
+            {
+                provider.Complete(CreateObject("Prefab"));
+            }
+            var input = new Input();
+            var source = new Source();
+            using var controller = CreateController(input, source, provider, 5f);
+            controller.Initialize();
+            if (state == "ViewsFailed")
+            {
+                provider.Fail();
+                controller.Tick(0f);
+            }
+            else if (state == "LevelFailed")
+            {
+                source.Fail = true;
+                input.NextLevelPressed = true;
+                LogAssert.Expect(LogType.Exception, new Regex("planned definition failure"));
+                controller.Tick(0f);
+                input.NextLevelPressed = false;
+            }
+            else if (state == "Completed" || state == "Finished")
+            {
+                CompleteCurrentLevel(controller);
+                if (state == "Finished")
+                {
+                    controller.Tick(0.75f);
+                    CompleteCurrentLevel(controller);
+                    controller.Tick(0.75f);
+                }
+            }
+            Assert.That(controller.Phase.ToString(), Is.EqualTo(state));
+            Simulation simulation = SimulationOf(controller);
+            var player = simulation.World.Single(entity => entity.Has<PlayerTag>());
+            GridPosition position = player.Get<GridPosition>();
+            simulation.Send(MoveCommand.Left);
+            bool pending = player.Has<MoveRequest>();
+            int reads = input.Reads;
+            float remaining = simulation.RemainingSeconds;
+            controller.Tick(0.25f);
+            Assert.That(player.Has<MoveRequest>(), Is.EqualTo(pending));
+            Assert.That(player.Get<GridPosition>(), Is.EqualTo(position));
+            Assert.That(simulation.RemainingSeconds, Is.EqualTo(remaining));
+            Assert.That(input.Reads, Is.EqualTo(reads));
+        }
 
         [Test]
         public void SkinCycle_VisitsEveryValueAndWrapsAfterExactlyOneCycle()
@@ -425,15 +727,206 @@ namespace Sokoban.Tests.PlayMode
             simulation.World.Single(entity => entity.Has<BoxTag>()).Set(new GridPosition(4, 2));
             controller.Tick();
             Assert.That(StateOf(controller), Is.EqualTo("Completed"));
-            typeof(GameplayController).GetField("_completionTimer", BindingFlags.Instance | BindingFlags.NonPublic)
-                .SetValue(controller, 0.75f);
             int reads = input.Reads;
             input.NextLevelPressed = true;
             input.RestartPressed = true;
-            controller.Tick();
+            controller.Tick(0.75f);
             Assert.That(source.Requests, Is.EqualTo(new[] { 0, 1 }));
             Assert.That(StateOf(controller), Is.EqualTo("BindingViews"));
             Assert.That(input.Reads, Is.EqualTo(reads));
+        }
+
+        [Test]
+        public void LastLevel_FinishesWithOneResultPerCompletionAndRestartClearsResults()
+        {
+            var provider = new Provider();
+            provider.Complete(CreateObject("Prefab"));
+            var input = new Input();
+            var source = new Source { Definition = LevelParser.Parse("#####\n#@$.#\n#####") };
+            using var controller = CreateController(input, source, provider);
+            IGameplayStatus status = controller;
+            Assert.That(status.LevelCount, Is.Zero);
+            controller.Initialize();
+            for (int index = 0; index < 2; index++)
+            {
+                controller.Tick();
+                Assert.That(status.LevelNumber, Is.EqualTo(index + 1));
+                Assert.That(status.LevelCount, Is.EqualTo(2));
+                Assert.That(status.Moves, Is.Zero);
+                input.Move = MoveCommand.Right;
+                controller.Tick();
+                input.Move = default;
+                Assert.That(status.Phase, Is.EqualTo(GameplayPhase.Completed));
+                Assert.That(status.Moves, Is.EqualTo(1));
+                Assert.That(status.Results.Count, Is.EqualTo(index + 1));
+                Assert.That(status.Results[index].Moves, Is.EqualTo(1));
+                controller.Tick(0.75f);
+            }
+            Simulation last = SimulationOf(controller);
+            Assert.That(status.Phase, Is.EqualTo(GameplayPhase.Finished));
+            int reads = input.Reads;
+            float remaining = status.RemainingSeconds;
+            input.Move = MoveCommand.Left;
+            input.NextLevelPressed = true;
+            input.NextSkinPressed = true;
+            controller.Tick();
+            input.NextSkinPressed = false;
+            controller.Tick();
+            Assert.That(status.Phase, Is.EqualTo(GameplayPhase.Finished));
+            Assert.That(status.Results.Count, Is.EqualTo(2));
+            Assert.That(status.RemainingSeconds, Is.EqualTo(remaining));
+            Assert.That(input.Reads, Is.EqualTo(reads));
+            Assert.That(SimulationOf(controller), Is.SameAs(last));
+            Assert.That(last.World.Single(entity => entity.Has<PlayerTag>()).Get<ViewSkin>().Id, Is.EqualTo(SkinId.Alternate));
+            Assert.That(source.Requests, Is.EqualTo(new[] { 0, 1 }));
+            input.RestartPressed = true;
+            controller.Tick();
+            Assert.That(status.Phase, Is.EqualTo(GameplayPhase.BindingViews));
+            Assert.That(status.LevelNumber, Is.EqualTo(1));
+            Assert.That(status.Moves, Is.Zero);
+            Assert.That(status.Results, Is.Empty);
+            Assert.That(source.Requests, Is.EqualTo(new[] { 0, 1, 0 }));
+            Assert.That(SimulationOf(controller), Is.Not.SameAs(last));
+        }
+
+        [Test]
+        public void RestartTimeoutAndDevLevelCycling_DoNotRecordResults()
+        {
+            var provider = new Provider();
+            provider.Complete(CreateObject("Prefab"));
+            var source = new Source();
+            var input = new Input();
+            using var controller = CreateController(input, source, provider);
+            controller.Initialize();
+            controller.Tick();
+            input.RestartPressed = true;
+            controller.Tick();
+            input.RestartPressed = false;
+            input.NextLevelPressed = true;
+            controller.Tick();
+            controller.Tick();
+            input.NextLevelPressed = false;
+            controller.Tick();
+            controller.Tick(60f);
+            Assert.That(controller.Phase, Is.EqualTo(GameplayPhase.BindingViews));
+            Assert.That(controller.Results, Is.Empty);
+            Assert.That(source.Requests, Is.EqualTo(new[] { 0, 1, 0 }));
+        }
+
+        [Test]
+        public void Commands_CoalesceWithKeyboardAndAreConsumedOnce()
+        {
+            var provider = new Provider();
+            provider.Complete(CreateObject("Prefab"));
+            var input = new Input();
+            using var controller = CreateController(input, new Source(), provider);
+            controller.Initialize();
+            controller.Tick(0f);
+            Simulation previous = SimulationOf(controller);
+            controller.RequestRestart();
+            controller.RequestRestart();
+            controller.RequestNextSkin();
+            controller.RequestNextSkin();
+            input.RestartPressed = true;
+            input.NextSkinPressed = true;
+            controller.Tick(0f);
+            Simulation replacement = SimulationOf(controller);
+            Assert.That(replacement, Is.Not.SameAs(previous));
+            Assert.That(replacement.World.Single(e => e.Has<PlayerTag>()).Get<ViewSkin>().Id, Is.EqualTo(SkinId.Alternate));
+            input.RestartPressed = false;
+            input.NextSkinPressed = false;
+            controller.Tick(0f);
+            Assert.That(SimulationOf(controller), Is.SameAs(replacement));
+            Assert.That(controller.Phase, Is.EqualTo(GameplayPhase.Playing));
+        }
+
+        [Test]
+        public void Commands_DuringLoadingAreRejectedWithoutDelayedReplay()
+        {
+            var provider = new Provider();
+            provider.Complete(CreateObject("Prefab"));
+            var data = new TestStaticData { Pending = new UniTaskCompletionSource() };
+            var source = new Source();
+            using var controller = CreateController(new Input(), source, provider, staticData: data);
+            controller.Initialize();
+            Assert.That(controller.CanRestart || controller.CanSwitchSkin, Is.False);
+            controller.RequestRestart();
+            controller.RequestNextSkin();
+            controller.Tick(0f);
+            data.Pending.TrySetResult();
+            Simulation initial = SimulationOf(controller);
+            controller.Tick(0f);
+            Assert.That(SimulationOf(controller), Is.SameAs(initial));
+            Assert.That(source.Requests, Is.EqualTo(new[] { 0 }));
+            Assert.That(initial.World.Single(e => e.Has<PlayerTag>()).Get<ViewSkin>().Id, Is.EqualTo(SkinId.Default));
+        }
+
+        [Test]
+        public void SkinCommand_RecoversAViewFailureWithoutRestart()
+        {
+            var provider = new Provider { FailAlternatePlayer = true };
+            provider.Complete(CreateObject("Prefab"));
+            using var controller = CreateController(new Input(), new Source(), provider);
+            controller.Initialize();
+            controller.Tick(0f);
+            Simulation original = SimulationOf(controller);
+            controller.RequestNextSkin();
+            controller.Tick(0f);
+            Assert.That(controller.Phase, Is.EqualTo(GameplayPhase.ViewsFailed));
+            Assert.That(controller.CanSwitchSkin, Is.True);
+            controller.RequestNextSkin();
+            controller.Tick(0f);
+            Assert.That(controller.Phase, Is.EqualTo(GameplayPhase.Playing));
+            Assert.That(SimulationOf(controller), Is.SameAs(original));
+        }
+
+        [Test]
+        public void ReplayCommand_FromFinishedClearsResultsAndStartsFirstLevel()
+        {
+            var provider = new Provider();
+            provider.Complete(CreateObject("Prefab"));
+            var source = new Source();
+            using var controller = CreateController(new Input(), source, provider);
+            controller.Initialize();
+            CompleteCurrentLevel(controller);
+            controller.Tick(0.75f);
+            CompleteCurrentLevel(controller);
+            controller.Tick(0.75f);
+            Assert.That(controller.Phase, Is.EqualTo(GameplayPhase.Finished));
+            Assert.That(controller.Results.Count, Is.EqualTo(2));
+            controller.RequestNextSkin();
+            controller.Tick(0f);
+            Assert.That(controller.Results.Count, Is.EqualTo(2));
+            controller.RequestRestart();
+            controller.Tick(0f);
+            Assert.That(controller.Results, Is.Empty);
+            Assert.That(controller.LevelNumber, Is.EqualTo(1));
+            Assert.That(source.Requests, Is.EqualTo(new[] { 0, 1, 0 }));
+        }
+
+        [Test]
+        public void NonDefaultMoveDuration_ReachesTheComposedViewLayer()
+        {
+            var provider = new Provider();
+            provider.Complete(CreateObject("Prefab"));
+            var input = new Input();
+            using var controller = CreateController(input, new Source(), provider, moveDuration: 0.4f);
+            controller.Initialize();
+            controller.Tick(0f);
+            input.Move = MoveCommand.Right;
+            controller.Tick(0.1f);
+            Entity player = SimulationOf(controller).World.Single(e => e.Has<PlayerTag>());
+            Assert.That(player.Get<ViewMove>().Duration, Is.EqualTo(0.4f));
+            Assert.That(player.Get<TransformComponent>().Transform.position.x, Is.EqualTo(2.25f).Within(0.001f));
+        }
+
+        private static void CompleteCurrentLevel(GameplayController controller)
+        {
+            controller.Tick(0f);
+            Simulation simulation = SimulationOf(controller);
+            simulation.World.Single(e => e.Has<BoxTag>()).Set(new GridPosition(4, 2));
+            controller.Tick(0f);
+            Assert.That(controller.Phase, Is.EqualTo(GameplayPhase.Completed));
         }
 
         private GameObject CreateObject(string name)
@@ -449,8 +942,7 @@ namespace Sokoban.Tests.PlayMode
             return (Simulation)run?.GetType().GetField("_simulation", BindingFlags.Instance | BindingFlags.NonPublic).GetValue(run);
         }
 
-        private static string StateOf(GameplayController controller) =>
-            typeof(GameplayController).GetField("_state", BindingFlags.Instance | BindingFlags.NonPublic).GetValue(controller).ToString();
+        private static string StateOf(GameplayController controller) => controller.Phase.ToString();
 
         private sealed class Input : IPlayerInput
         {
@@ -472,14 +964,15 @@ namespace Sokoban.Tests.PlayMode
             public bool Fail { get; set; }
             public bool ReturnNull { get; set; }
             public List<int> Requests { get; } = new();
+            public LevelDefinition Definition { get; set; } = new(5, 3, new GridPosition(2, 1), Array.Empty<GridPosition>(),
+                new[] { new GridPosition(0, 0) }, new[] { new GridPosition(4, 2) });
             public UniTask<LevelDefinition> LoadAsync(int index, CancellationToken ct)
             {
                 Requests.Add(index);
                 if (ReturnNull) return UniTask.FromResult<LevelDefinition>(null);
                 return Fail
                     ? UniTask.FromException<LevelDefinition>(new InvalidOperationException("planned definition failure"))
-                    : UniTask.FromResult(new LevelDefinition(5, 3, new GridPosition(2, 1), Array.Empty<GridPosition>(),
-                        new[] { new GridPosition(0, 0) }, new[] { new GridPosition(4, 2) }));
+                    : UniTask.FromResult(Definition);
             }
         }
 

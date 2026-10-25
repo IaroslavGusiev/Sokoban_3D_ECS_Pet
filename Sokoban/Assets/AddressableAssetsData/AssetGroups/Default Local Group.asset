@@ -20,12 +20,7 @@ MonoBehaviour:
     m_ReadOnly: 0
     m_SerializedLabels: []
     FlaggedDuringContentUpdateRestriction: 0
-  - m_GUID: 4bdf32bf7ca4573459ec351bb1f5d74f
-    m_Address: views/player
-    m_ReadOnly: 0
-    m_SerializedLabels: []
-    FlaggedDuringContentUpdateRestriction: 0
-  - m_GUID: 536d8fce894170a4b83cc7dddd75787a
+  - m_GUID: 2fd65e7f0590d8948b9cbfde49cc4353
     m_Address: views/player_alt
     m_ReadOnly: 0
     m_SerializedLabels: []
@@ -50,8 +45,18 @@ MonoBehaviour:
     m_ReadOnly: 0
     m_SerializedLabels: []
     FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 9fad128362dd4424fb13f2185713af51
+    m_Address: views/player
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
   - m_GUID: b6213fcb1f25f8c4fbfe649a01567b44
     m_Address: levels/level-03
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: de4acb979ebd8a74abb271369f43b8da
+    m_Address: views/player_punk
     m_ReadOnly: 0
     m_SerializedLabels: []
     FlaggedDuringContentUpdateRestriction: 0

@@ -2,6 +2,7 @@
 #if UNITY_EDITOR
 using System;
 using System.Collections;
+using System.Collections.Generic;
 using DefaultEcs;
 using Sokoban.Core.Components;
 using System.Linq;
@@ -58,13 +59,20 @@ namespace Sokoban.Tests.PlayMode
             ITickable tickable = context.Container.ResolveAll<ITickable>().Single();
             Assert.That(tickable, Is.TypeOf<GameplayController>());
             _controller = context.Container.Resolve<GameplayController>();
+            Assert.That(context.Container.Resolve<IGameplayStatus>(), Is.SameAs(_controller));
+            Assert.That(context.Container.Resolve<IGameplayCommands>(), Is.SameAs(_controller));
             Assert.That(tickable, Is.SameAs(_controller));
+            var disposables = context.Container.ResolveAll<IDisposable>();
+            Assert.That(disposables.OfType<GameplayLifetime>().Single(),
+                Is.SameAs(context.Container.Resolve<GameplayLifetime>()));
+            Assert.That(disposables.OfType<GameplayController>(), Is.Empty);
+            Assert.That(disposables.OfType<ViewAssets>(), Is.Empty);
+            Assert.That(disposables.OfType<StaticDataProvider>(), Is.Empty);
             _levelRoot = context.Container.Resolve<LevelRoot>().Transform;
-            _catalog = context.Container.Resolve<ViewCatalog>();
             float deadline = Time.realtimeSinceStartup + 10f;
-            while (typeof(GameplayController).GetField("_state", BindingFlags.Instance | BindingFlags.NonPublic)
-                .GetValue(_controller).ToString() != "Playing" && Time.realtimeSinceStartup < deadline) yield return null;
+            while (_controller.Phase != GameplayPhase.Playing && Time.realtimeSinceStartup < deadline) yield return null;
             Assert.That(CurrentSimulation, Is.Not.Null, "Initial Addressable content did not load within 10 seconds.");
+            _catalog = context.Container.Resolve<IStaticDataProvider>().GetViewCatalog();
             while (CurrentSimulation.World.Any(entity => !entity.Has<TransformComponent>()) && Time.realtimeSinceStartup < deadline) yield return null;
             Assert.That(Board.childCount, Is.EqualTo(76));
         }
@@ -102,7 +110,7 @@ namespace Sokoban.Tests.PlayMode
             Assert.That(secondGoal.GetComponentInChildren<Renderer>().sharedMaterial, Is.SameAs(goalMaterial));
 
             yield return Move(MoveCommand.Up);
-            Assert.That(View("Box (4, 3)").position, Is.EqualTo(new Vector3(4, 0, 5)));
+            Assert.That(View("Box (4, 3)").position, Is.EqualTo(new Vector3(4, 0, 4)));
             Assert.That(secondGoal.position, Is.EqualTo(new Vector3(4, 0, 4)));
             Assert.That(secondGoal.GetComponentInChildren<Renderer>().sharedMaterial, Is.SameAs(goalMaterial));
         }
@@ -155,15 +163,19 @@ namespace Sokoban.Tests.PlayMode
         }
 
         [UnityTest]
-        public IEnumerator DisposingController_ReleasesCurrentWorldAndViews()
+        public IEnumerator DisposingGameplayLifetime_ReleasesCurrentWorldAndViews()
         {
             Transform previousBoard = Board;
             yield return Move(MoveCommand.Left);
             SceneContext context = _scene.GetRootGameObjects().Select(root => root.GetComponent<SceneContext>())
                 .Single(component => component != null);
             context.Container.Resolve<TickableManager>().Remove(_controller);
-            context.Container.Resolve<DisposableManager>().Remove(_controller);
-            _controller.Dispose();
+            GameplayLifetime lifetime = context.Container.Resolve<GameplayLifetime>();
+            context.Container.Resolve<DisposableManager>().Remove(lifetime);
+            foreach (GameplayDebugOverlay overlay in _scene.GetRootGameObjects()
+                         .SelectMany(root => root.GetComponentsInChildren<GameplayDebugOverlay>(true)))
+                overlay.enabled = false;
+            lifetime.Dispose();
             Assert.That(previousBoard.gameObject.activeSelf, Is.False);
             Assert.That(CurrentSimulation, Is.Null);
             yield return null;
@@ -173,15 +185,18 @@ namespace Sokoban.Tests.PlayMode
         }
 
         [UnityTest]
-        public IEnumerator QueuedMove_WaitsForTickAndUpdatesBothActorsBeforeTickReturns()
+        public IEnumerator QueuedMove_CommitsGridBeforeViewsFinishInterpolating()
         {
             CurrentSimulation.Send(MoveCommand.Left);
             AssertActors(new Vector3(3, 0, 2), new Vector3(2, 0, 3), new Vector3(4, 0, 3));
             TickController();
+            Assert.That(CurrentSimulation.World.Single(entity => entity.Has<PlayerTag>()).Get<GridPosition>(), Is.EqualTo(new GridPosition(2, 2)));
+            yield return WaitForMotion();
             AssertActors(new Vector3(2, 0, 2), new Vector3(2, 0, 3), new Vector3(4, 0, 3));
 
             CurrentSimulation.Send(MoveCommand.Up);
             TickController();
+            yield return WaitForMotion();
             AssertActors(new Vector3(2, 0, 3), new Vector3(2, 0, 4), new Vector3(4, 0, 3));
             TickController();
             AssertActors(new Vector3(2, 0, 3), new Vector3(2, 0, 4), new Vector3(4, 0, 3));
@@ -193,6 +208,7 @@ namespace Sokoban.Tests.PlayMode
         {
             InputSystem.QueueStateEvent(_keyboard, new KeyboardState(Key.UpArrow, Key.LeftArrow));
             for (int i = 0; i < 8; i++) yield return null;
+            yield return WaitForMotion();
             AssertActors(new Vector3(3, 0, 3), new Vector3(2, 0, 3), new Vector3(4, 0, 3));
             InputSystem.QueueStateEvent(_keyboard, new KeyboardState());
             yield return null;
@@ -201,8 +217,98 @@ namespace Sokoban.Tests.PlayMode
         }
 
         [UnityTest]
+        public IEnumerator GoalArrival_AnimatesTheBoxVisualAndRestartClearsFeedback()
+        {
+            SceneContext context = _scene.GetRootGameObjects().Select(root => root.GetComponent<SceneContext>())
+                .Single(component => component != null);
+            context.Container.Resolve<TickableManager>().Remove(_controller);
+            CurrentSimulation.Send(MoveCommand.Left);
+            _controller.Tick(0.16f);
+            Entity box = CurrentSimulation.World.Single(e => e.Has<BoxTag>() && e.Get<GridPosition>() == new GridPosition(2, 3));
+            Assert.That(box.Has<BoxGoalFeedbackComponent>(), Is.True);
+            BoxGoalAnimator animator = box.Get<BoxGoalFeedbackComponent>().Animator;
+            Transform visual = animator.transform.Find("Visual");
+            Vector3 baseline = visual.localPosition;
+            Vector3 scale = visual.localScale;
+            Transform oldBoard = Board;
+            CurrentSimulation.Send(MoveCommand.Up);
+            _controller.Tick(0f);
+            Assert.That(box.Get<GridPosition>(), Is.EqualTo(new GridPosition(2, 4)));
+            Assert.That(animator.IsPlaying, Is.False);
+            Assert.That(visual.localPosition, Is.EqualTo(baseline));
+            _controller.Tick(0.16f);
+            Assert.That(animator.IsPlaying, Is.True);
+            _controller.Tick(0.055f);
+            Assert.That(visual.localPosition.y, Is.GreaterThan(baseline.y));
+            Assert.That(visual.localScale, Is.Not.EqualTo(scale));
+            Assert.That(box.Get<TransformComponent>().Transform.position, Is.EqualTo(new Vector3(2, 0, 4)));
+            _controller.RequestRestart();
+            _controller.Tick(0f);
+            Assert.That(oldBoard.gameObject.activeSelf, Is.False);
+            Assert.That(visual.localPosition, Is.EqualTo(baseline));
+            Assert.That(visual.localScale, Is.EqualTo(scale));
+            Assert.That(animator.IsPlaying, Is.False);
+            Assert.That(PrimeTween.Tween.GetTweensCount(visual), Is.Zero);
+            Assert.That(CurrentSimulation.World.Where(e => e.Has<BoxTag>()).All(e => !e.Get<BoxGoalFeedbackComponent>().Animator.IsPlaying), Is.True);
+            yield return null;
+            Assert.That(oldBoard == null, Is.True);
+        }
+
+        [UnityTest]
+        public IEnumerator OverlayCommands_SwitchSkinAndRestartThroughTheSceneBinding()
+        {
+            SceneContext context = _scene.GetRootGameObjects().Select(root => root.GetComponent<SceneContext>())
+                .Single(component => component != null);
+            IGameplayCommands commands = context.Container.Resolve<IGameplayCommands>();
+            Simulation original = CurrentSimulation;
+            Entity player = original.World.Single(e => e.Has<PlayerTag>());
+            commands.RequestNextSkin();
+            float deadline = Time.realtimeSinceStartup + 5f;
+            while ((!player.Has<PlayerAnimatorComponent>() || player.Get<ViewSkin>().Id != SkinId.Alternate)
+                   && Time.realtimeSinceStartup < deadline) yield return null;
+            Assert.That(player.Get<ViewSkin>().Id, Is.EqualTo(SkinId.Alternate));
+            Assert.That(player.Has<PlayerAnimatorComponent>(), Is.True);
+            Assert.That(CurrentSimulation, Is.SameAs(original));
+            commands.RequestRestart();
+            while (CurrentSimulation == original && Time.realtimeSinceStartup < deadline) yield return null;
+            Assert.That(CurrentSimulation, Is.Not.SameAs(original));
+            Assert.That(CurrentSimulation.World.Single(e => e.Has<PlayerTag>()).Get<ViewSkin>().Id, Is.EqualTo(SkinId.Alternate));
+        }
+
+        [UnityTest]
+        public IEnumerator SkinCycle_LoadsAllThreeAnimatorAdaptersWithoutReplacingTheSimulation()
+        {
+            Simulation simulation = CurrentSimulation;
+            Entity player = simulation.World.Single(entity => entity.Has<PlayerTag>());
+            foreach (SkinId skin in new[] { SkinId.Default, SkinId.Alternate, SkinId.Punk, SkinId.Default })
+            {
+                if (player.Get<ViewSkin>().Id != skin) yield return Press(Key.K);
+                float deadline = Time.realtimeSinceStartup + 5f;
+                while (!player.Has<PlayerAnimatorComponent>() && Time.realtimeSinceStartup < deadline) yield return null;
+                Assert.That(player.Get<ViewSkin>().Id, Is.EqualTo(skin));
+                Assert.That(player.Has<PlayerAnimatorComponent>(), Is.True);
+                Assert.That(player.Get<PlayerAnimatorComponent>().Animator != null, Is.True);
+                Assert.That(CurrentSimulation, Is.SameAs(simulation));
+                Assert.That(player.Has<ViewMove>(), Is.False);
+            }
+        }
+
+        [UnityTest]
         public IEnumerator SceneUnload_ReleasesControllerWorldAndGeneratedViews()
         {
+            SceneContext context = _scene.GetRootGameObjects().Select(root => root.GetComponent<SceneContext>())
+                .Single(component => component != null);
+            context.Container.Resolve<TickableManager>().Remove(_controller);
+            CurrentSimulation.Send(MoveCommand.Left);
+            _controller.Tick(0.16f);
+            CurrentSimulation.Send(MoveCommand.Up);
+            _controller.Tick(0.16f);
+            _controller.Tick(0.05f);
+            Entity box = CurrentSimulation.World.Single(e => e.Has<BoxTag>() && e.Get<GridPosition>() == new GridPosition(2, 4));
+            BoxGoalAnimator animator = box.Get<BoxGoalFeedbackComponent>().Animator;
+            Transform visual = animator.transform.Find("Visual");
+            Assert.That(animator.IsPlaying, Is.True);
+            Assert.That(PrimeTween.Tween.GetTweensCount(visual), Is.GreaterThan(0));
             Simulation previous = CurrentSimulation;
             int disposedWorlds = 0;
             using var subscription = previous.World.SubscribeWorldDisposed(_ => disposedWorlds++);
@@ -213,22 +319,23 @@ namespace Sokoban.Tests.PlayMode
             Assert.That(previousBoard == null, Is.True);
             Assert.That(disposedWorlds, Is.EqualTo(1));
             Assert.That(CurrentSimulation, Is.Null);
+            Assert.That(PrimeTween.Tween.GetTweensCount(visual), Is.Zero);
             _scene = default;
         }
 
         [UnityTest]
         public IEnumerator Restart_ReusesLoadedPrefabsAfterCatalogChanges()
         {
-            FieldInfo entries = typeof(ViewCatalog).GetField("entries", BindingFlags.Instance | BindingFlags.NonPublic);
-            var originalEntries = (ViewCatalog.KindEntry[])entries.GetValue(_catalog);
+            FieldInfo entries = typeof(ViewCatalog).GetField("<Entries>k__BackingField", BindingFlags.Instance | BindingFlags.NonPublic);
+            var originalEntries = (List<ViewCatalog.KindEntry>)entries.GetValue(_catalog);
             var invalidEntries = originalEntries.Select(entry => new ViewCatalog.KindEntry
             {
                 Kind = entry.Kind, Skins = entry.Skins.Select(skin => new ViewCatalog.SkinEntry
                 {
                     Skin = skin.Skin, Address = skin.Address
-                }).ToArray()
-            }).ToArray();
-            int boxIndex = Array.FindIndex(invalidEntries, entry => entry.Kind == ViewKind.Box);
+                }).ToList()
+            }).ToList();
+            int boxIndex = invalidEntries.FindIndex(entry => entry.Kind == ViewKind.Box);
             Simulation previous = CurrentSimulation;
             try
             {
@@ -300,7 +407,15 @@ namespace Sokoban.Tests.PlayMode
             CurrentSimulation.Send(command);
             TickController();
             yield return null;
-            yield return null;
+            yield return WaitForMotion();
+        }
+
+        private IEnumerator WaitForMotion()
+        {
+            float deadline = Time.realtimeSinceStartup + 2f;
+            while (CurrentSimulation.World.Any(entity => entity.Has<ViewMove>()) && Time.realtimeSinceStartup < deadline)
+                yield return null;
+            Assert.That(CurrentSimulation.World.Any(entity => entity.Has<ViewMove>()), Is.False);
         }
 
         private void SetRestartInput()
@@ -331,6 +446,7 @@ namespace Sokoban.Tests.PlayMode
             yield return null;
             InputSystem.QueueStateEvent(_keyboard, new KeyboardState());
             yield return null;
+            yield return WaitForMotion();
         }
     }
 }

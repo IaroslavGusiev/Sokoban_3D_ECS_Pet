@@ -3,6 +3,7 @@ namespace Sokoban.Presentation
     public enum SkinId
     {
         Default, 
-        Alternate
+        Alternate,
+        Punk
     }
 }

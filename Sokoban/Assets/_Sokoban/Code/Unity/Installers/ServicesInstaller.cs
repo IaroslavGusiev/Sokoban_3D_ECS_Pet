@@ -1,4 +1,5 @@
 using Zenject;
+using Sokoban.Core;
 using UnityEngine;
 using UnityEngine.Serialization;
 
@@ -8,39 +9,42 @@ namespace Sokoban.Presentation
     {
         [FormerlySerializedAs("_levelRoot")]
         [SerializeField] private Transform levelRoot;
-        [FormerlySerializedAs("_viewCatalog")]
-        [SerializeField] private ViewCatalog viewCatalog;
-        [SerializeField] private LevelList levelList;
 
         public override void InstallBindings()
         {
-            viewCatalog.Validate();
-            levelList.Validate();
+            Container
+                .Bind<IAddressablesService>()
+                .To<AddressablesService>()
+                .AsSingle();
 
             Container
-                .BindInterfacesAndSelfTo<ViewAssets>()
+                .Bind<IStaticDataProvider>()
+                .To<StaticDataProvider>()
+                .AsSingle();
+
+            Container
+                .Bind<LevelRunFactory>()
+                .AsSingle();
+
+            Container
+                .Bind<LevelPopulator>()
+                .AsSingle();
+
+            Container
+                .Bind(typeof(ViewAssets), typeof(IViewProvider))
+                .To<ViewAssets>()
                 .AsSingle();
 
             Container
                 .Bind<ILevelSource>()
                 .To<AddressableLevelSource>()
                 .AsSingle();
-            
+
             Container
                 .Bind<IPlayerInput>()
                 .To<KeyboardMoveInput>()
                 .AsSingle();
-            
-            Container
-                .Bind<LevelList>()
-                .FromInstance(levelList)
-                .AsSingle();
 
-            Container
-                .Bind<ViewCatalog>()
-                .FromInstance(viewCatalog)
-                .AsSingle();
-            
             Container
                 .Bind<LevelRoot>()
                 .FromInstance(new LevelRoot(levelRoot))

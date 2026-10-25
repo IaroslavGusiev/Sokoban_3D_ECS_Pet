@@ -3,6 +3,7 @@
     "rootNamespace": "Sokoban.Presentation",
     "references": [
         "Sokoban.Core",
+        "PrimeTween.Runtime",
 
         "Unity.InputSystem",
         "Zenject",

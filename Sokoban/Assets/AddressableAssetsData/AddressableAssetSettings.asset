@@ -64,6 +64,7 @@ MonoBehaviour:
   m_BuildAddressablesWithPlayerBuild: 0
   m_overridePlayerVersion: '[UnityEditor.PlayerSettings.bundleVersion]'
   m_GroupAssets:
+  - {fileID: 11400000, guid: c5355708ab036304a921ae1de95e57ff, type: 2}
   - {fileID: 11400000, guid: 0fadc29bc66056347b182c48b28c005b, type: 2}
   m_BuildSettings:
     m_LogResourceManagerExceptions: 0
@@ -104,6 +105,7 @@ MonoBehaviour:
   m_LabelTable:
     m_LabelNames:
     - default
+    - Configs
   m_SchemaTemplates: []
   m_GroupTemplateObjects:
   - {fileID: 11400000, guid: 39670083fd5297c43b8b57e159257d86, type: 2}

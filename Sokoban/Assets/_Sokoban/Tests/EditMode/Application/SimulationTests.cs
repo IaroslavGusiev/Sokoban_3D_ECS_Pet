@@ -15,7 +15,7 @@ namespace Sokoban.Tests.App
         [Test]
         public void PushingOnlyBoxOntoGoal_CompletesOnceAfterMovement()
         {
-            using var simulation = new Simulation(LevelParser.Parse("#####\n#@$.#\n#####"));
+            using var simulation = new Simulation(LevelParser.Parse("#####\n#@$.#\n#####"), new LevelPopulator(), 60f);
             Entity player = simulation.World.Single(entity => entity.Has<PlayerTag>());
             int completions = 0;
             using var subscription = simulation.World.SubscribeComponentAdded<LevelCompletedTag>((in Entity entity, in LevelCompletedTag _) =>
@@ -39,7 +39,7 @@ namespace Sokoban.Tests.App
         [Test]
         public void TwoBoxes_RequireBothGoalsToBeCovered()
         {
-            using var simulation = new Simulation(LevelParser.Parse("#######\n#@$.--#\n#--$.-#\n#######"));
+            using var simulation = new Simulation(LevelParser.Parse("#######\n#@$.--#\n#--$.-#\n#######"), new LevelPopulator(), 60f);
             simulation.Send(MoveCommand.Right);
             simulation.Tick(0f);
             Assert.That(simulation.IsCompleted, Is.False);
@@ -70,11 +70,12 @@ namespace Sokoban.Tests.App
         }
 
         [Test]
-        public void Simulations_SharingDefinitionHaveIndependentWorldsAndPositions()
+        public void Simulations_SharingDefinitionAndPopulatorHaveIndependentWorldsAndPositions()
         {
             LevelDefinition level = CreateLevel();
-            using (var first = CreateSimulation(level))
-            using (var second = CreateSimulation(level))
+            var populator = new LevelPopulator();
+            using (var first = new Simulation(level, populator, 60f))
+            using (var second = new Simulation(level, populator, 60f))
             {
                 Assert.That(first.World.First().World, Is.Not.SameAs(second.World.First().World));
                 first.Send(MoveCommand.Left);
@@ -118,10 +119,11 @@ namespace Sokoban.Tests.App
         [Test]
         public void DisposedSimulation_CannotExposeAReplacementWorld()
         {
-            var previous = CreateSimulation(CreateLevel());
+            var populator = new LevelPopulator();
+            var previous = new Simulation(CreateLevel(), populator, 60f);
             World oldWorld = previous.World;
             previous.Dispose();
-            using var replacement = CreateSimulation(CreateLevel());
+            using var replacement = new Simulation(CreateLevel(), populator, 60f);
             Assert.That(replacement.World, Is.Not.SameAs(oldWorld));
             replacement.Send(MoveCommand.Left);
             replacement.Tick(0f);
@@ -204,7 +206,7 @@ namespace Sokoban.Tests.App
                 Assert.That(phase++, Is.EqualTo(1));
                 Assert.That(world.Single(entity => entity.Has<PlayerTag>()).Get<GridPosition>(), Is.EqualTo(new GridPosition(2, 2)));
             }));
-            using var simulation = new Simulation(CreateLevel(), new IFeature[] { input, new MovementFeature(), output });
+            using var simulation = new Simulation(CreateLevel(), new LevelPopulator(), 60f, new IFeature[] { input, new MovementFeature(), output });
             simulation.Tick(0.25f);
             Assert.That(phase, Is.EqualTo(2));
         }
@@ -214,7 +216,7 @@ namespace Sokoban.Tests.App
         {
             var first = new TestSystem(_ => { });
             var last = new TestSystem(_ => { });
-            var simulation = new Simulation(CreateLevel(), new IFeature[]
+            var simulation = new Simulation(CreateLevel(), new LevelPopulator(), 60f, new IFeature[]
             {
                 new TestFeature(_ => first), new MovementFeature(), new TestFeature(_ => last)
             });
@@ -232,7 +234,7 @@ namespace Sokoban.Tests.App
         public void PipelineDisposalFailure_StillDisposesWorld()
         {
             var system = new TestSystem(_ => { }) { ThrowOnDispose = true };
-            var simulation = new Simulation(CreateLevel(), new[] { new TestFeature(_ => system) });
+            var simulation = new Simulation(CreateLevel(), new LevelPopulator(), 60f, new[] { new TestFeature(_ => system) });
             int worldDisposals = 0;
             using var subscription = simulation.World.SubscribeWorldDisposed(_ => worldDisposals++);
             Assert.Throws<InvalidOperationException>(() => simulation.Dispose());
@@ -240,7 +242,7 @@ namespace Sokoban.Tests.App
         }
 
         private static Simulation CreateSimulation(LevelDefinition level) =>
-            new Simulation(level);
+            new Simulation(level, new LevelPopulator(), 60f);
 
         private sealed class TestFeature : IFeature
         {

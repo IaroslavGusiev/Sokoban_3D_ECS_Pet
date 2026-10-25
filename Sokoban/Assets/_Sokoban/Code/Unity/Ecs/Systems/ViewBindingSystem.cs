@@ -69,7 +69,10 @@ namespace Sokoban.Presentation.Ecs.Systems
             {
                 var position = entity.Get<GridPosition>();
                 
-                view = Object.Instantiate(prefab, GridCoordinates.ToWorld(position), prefab.transform.rotation, _context.Root);
+                Vector3 viewPosition = entity.Has<ViewMove>() ? entity.Get<ViewMove>().Position : GridCoordinates.ToWorld(position);
+                Quaternion rotation = entity.Has<PlayerTag>() && entity.Has<ActorViewState>() && entity.Get<ActorViewState>().HasFacing
+                    ? entity.Get<ActorViewState>().Facing : prefab.transform.rotation;
+                view = Object.Instantiate(prefab, viewPosition, rotation, _context.Root);
                 view.name = $"{key} ({position.X}, {position.Y})";
                 
                 if (view.TryGetComponent(out EntityView entityView))

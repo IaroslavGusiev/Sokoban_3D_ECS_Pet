@@ -1,0 +1,13 @@
+namespace Sokoban.Presentation
+{
+    public enum GameplayPhase
+    {
+        Loading,
+        BindingViews,
+        Playing,
+        Completed,
+        ViewsFailed,
+        LevelFailed,
+        Finished
+    }
+}

@@ -48,5 +48,22 @@ namespace Sokoban.Tests.Editor
             AddressableAssetSettingsDefaultObject.Settings.GetAllAssets(entries, false);
             return entries;
         }
+
+        [Test]
+        public void MissingConfigLabelEntry_IsRejected()
+        {
+            string message = Assert.Throws<InvalidOperationException>(() =>
+                AddressableAddressValidator.ValidateConfigs(Entries().Where(entry => entry.address != "configs/gameplay"))).Message;
+            Assert.That(message, Does.Contain("GameplaySettings").And.Contain("found 0"));
+        }
+
+        [Test]
+        public void DuplicateConfigType_IsRejected()
+        {
+            var entries = Entries();
+            string message = Assert.Throws<InvalidOperationException>(() =>
+                AddressableAddressValidator.ValidateConfigs(entries.Append(entries.Single(entry => entry.address == "configs/gameplay")))).Message;
+            Assert.That(message, Does.Contain("GameplaySettings").And.Contain("found 2"));
+        }
     }
 }
