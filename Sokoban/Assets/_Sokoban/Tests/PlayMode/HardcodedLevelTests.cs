@@ -207,6 +207,52 @@ namespace Sokoban.Tests.PlayMode
         }
 
         [UnityTest]
+        public IEnumerator UndoShortcut_ReversesPushInterpolationAndStopsFeedbackWithoutReplacingViews()
+        {
+            SceneContext context = _scene.GetRootGameObjects().Select(root => root.GetComponent<SceneContext>())
+                .Single(component => component != null);
+            context.Container.Resolve<TickableManager>().Remove(_controller);
+            Simulation simulation = CurrentSimulation;
+            Entity[] entities = simulation.World.ToArray();
+            Transform board = Board;
+            CurrentSimulation.Send(MoveCommand.Left);
+            _controller.Tick(0.16f);
+            Entity box = CurrentSimulation.World.Single(e => e.Has<BoxTag>() && e.Get<GridPosition>() == new GridPosition(2, 3));
+            BoxGoalAnimator animator = box.Get<BoxGoalFeedbackComponent>().Animator;
+            Transform visual = animator.transform.Find("Visual");
+            Vector3 baseline = visual.localPosition;
+            Vector3 scale = visual.localScale;
+            CurrentSimulation.Send(MoveCommand.Up);
+            _controller.Tick(0.16f);
+            _controller.Tick(0.055f);
+            Assert.That(animator.IsPlaying, Is.True);
+            Assert.That(_controller.CanUndo, Is.True);
+            InputSystem.QueueStateEvent(_keyboard, new KeyboardState(Key.Z));
+            InputSystem.Update();
+            _controller.Tick(0.04f);
+            InputSystem.QueueStateEvent(_keyboard, new KeyboardState());
+            InputSystem.Update();
+            Assert.That(_controller.Moves, Is.EqualTo(1));
+            Assert.That(box.Get<GridPosition>(), Is.EqualTo(new GridPosition(2, 3)));
+            Assert.That(box.Get<TransformComponent>().Transform.position.z, Is.EqualTo(3.75f).Within(0.001f));
+            Assert.That(animator.IsPlaying, Is.False);
+            Assert.That(PrimeTween.Tween.GetTweensCount(visual), Is.Zero);
+            Assert.That(visual.localPosition, Is.EqualTo(baseline));
+            Assert.That(visual.localScale, Is.EqualTo(scale));
+            Assert.That(_controller.CanUndo, Is.False);
+            _controller.Tick(0.12f);
+            Assert.That(_controller.CanUndo, Is.True);
+            Assert.That(box.Get<TransformComponent>().Transform.position, Is.EqualTo(new Vector3(2, 0, 3)));
+            Assert.That(CurrentSimulation, Is.SameAs(simulation));
+            Assert.That(Board, Is.SameAs(board));
+            Assert.That(simulation.World.ToArray(), Is.EqualTo(entities));
+            CurrentSimulation.Send(MoveCommand.Up);
+            _controller.Tick(0.16f);
+            Assert.That(animator.IsPlaying, Is.True);
+            yield return null;
+        }
+
+        [UnityTest]
         public IEnumerator HeldKey_DoesNotRepeatAndSimultaneousDirectionsKeepPriority()
         {
             InputSystem.QueueStateEvent(_keyboard, new KeyboardState(Key.UpArrow, Key.LeftArrow));

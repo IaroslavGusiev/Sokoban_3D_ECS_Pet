@@ -8,5 +8,6 @@ namespace Sokoban.Presentation
         bool RestartPressed { get; }
         bool NextLevelPressed { get; }
         bool NextSkinPressed { get; }
+        bool UndoPressed { get; }
     }
 }

@@ -22,6 +22,16 @@ namespace Sokoban.Core.Systems
 
         protected override void Update(float deltaTime, in Entity entity)
         {
+            if (entity.Has<UndoProcessedTag>())
+            {
+                if (_player.IsAlive && _player.Has<GridPosition>())
+                {
+                    _lastPosition = _player.Get<GridPosition>();
+                }
+                entity.Remove<UndoProcessedTag>();
+                return;
+            }
+
             if (_player.IsEnabled() == false || _player.IsEnabled<GridPosition>() == false)
             {
                 return;

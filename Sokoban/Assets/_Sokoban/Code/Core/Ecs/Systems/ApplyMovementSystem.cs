@@ -8,6 +8,7 @@ namespace Sokoban.Core.Systems
     {
         private readonly World _world;
         private readonly EntitySet _plans;
+        private readonly EntitySet _levels;
 
         public bool IsEnabled { get; set; } = true;
 
@@ -18,6 +19,11 @@ namespace Sokoban.Core.Systems
             _plans = world
                 .GetEntities()
                 .With<MovementPlan>()
+                .AsSet();
+            _levels = world.GetEntities()
+                .With<LevelStateTag>()
+                .With<MoveHistory>()
+                .With<MoveCount>()
                 .AsSet();
         }
 
@@ -31,8 +37,11 @@ namespace Sokoban.Core.Systems
             }
         }
 
-        public void Dispose() =>
+        public void Dispose()
+        {
+            _levels.Dispose();
             _plans.Dispose();
+        }
 
         private void ApplyPlan(Entity owner)
         {
@@ -49,6 +58,11 @@ namespace Sokoban.Core.Systems
             {
                 MovementStep step = plan[index];
                 step.Target.Set(step.Destination);
+            }
+
+            foreach (Entity level in _levels.GetEntities())
+            {
+                level.Get<MoveHistory>().Entries.Push(new CommittedMove(plan, level.Get<MoveCount>().Value));
             }
         }
 

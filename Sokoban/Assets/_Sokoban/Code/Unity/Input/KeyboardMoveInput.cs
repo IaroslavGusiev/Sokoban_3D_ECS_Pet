@@ -6,6 +6,7 @@ namespace Sokoban.Presentation
     public sealed class KeyboardMoveInput : IPlayerInput
     {
         public bool NextSkinPressed => Keyboard.current.kKey.wasPressedThisFrame;
+        public bool UndoPressed => Keyboard.current.zKey.wasPressedThisFrame;
 
         public bool NextLevelPressed
         {

@@ -6,6 +6,7 @@ For implementation use [current architecture](../ARCHITECTURE.md); for running a
 
 | Record | Scope |
 | --- | --- |
+| [Run-owned ECS undo](UNDO.md) | Successful-move history, undo gating and snapshot synchronization, debug controls, and verification. |
 | [Core contract resolution](CORE-CONTRACT-RESOLUTION.md) | Approved numeric/overflow guarantees, single-player and pipeline invariants, and the resolution of all 21 baseline failures. |
 | [Level results and finish](LEVEL-RESULTS-FINISH.md) | Animation cleanup, Core move/time results, public gameplay status, finish/replay, guard audit, and manual overlay setup. |
 | [Early architecture](iterations/ARCHITECTURE-HISTORY.md) | Working design before the layer readability refactor. |

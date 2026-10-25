@@ -27,6 +27,7 @@ namespace Sokoban.Presentation
         private float _completionTimer;
         private bool _restartRequested;
         private bool _nextSkinRequested;
+        private bool _undoRequested;
         
         public int LevelCount { get; private set; }
         public GameplayPhase Phase { get; private set; }
@@ -41,6 +42,8 @@ namespace Sokoban.Presentation
         public bool CanRestart => Phase != GameplayPhase.Loading;
 
         public bool CanSwitchSkin => Phase != GameplayPhase.Loading && _run != null;
+
+        public bool CanUndo => Phase == GameplayPhase.Playing && _run != null && _run.CanUndo;
 
         [Inject]
         internal GameplayController(
@@ -86,23 +89,35 @@ namespace Sokoban.Presentation
             }
         }
 
+        public void RequestUndo()
+        {
+            if (CanUndo)
+            {
+                _undoRequested = true;
+            }
+        }
+
         public void Tick() => Tick(Time.deltaTime);
 
         internal void Tick(float deltaTime)
         {
             bool restartRequested = _restartRequested;
             bool nextSkinRequested = _nextSkinRequested;
+            bool undoRequested = _undoRequested;
             _restartRequested = false;
             _nextSkinRequested = false;
+            _undoRequested = false;
 
             if (Phase == GameplayPhase.Loading)
             {
                 return;
             }
 
+            undoRequested = (undoRequested || _input.UndoPressed) && CanUndo
+                && restartRequested == false && _input.RestartPressed == false && _input.NextLevelPressed == false;
             HandleSkinInput(nextSkinRequested);
             
-            if (TickState(deltaTime) == TickResult.ProcessCommands && Phase != GameplayPhase.Loading)
+            if (TickState(deltaTime, undoRequested) == TickResult.ProcessCommands && Phase != GameplayPhase.Loading)
             {
                 HandleCommands(restartRequested);
             }
@@ -128,7 +143,7 @@ namespace Sokoban.Presentation
             }
         }
 
-        private TickResult TickState(float deltaTime)
+        private TickResult TickState(float deltaTime, bool undoRequested)
         {
             switch (Phase)
             {
@@ -141,7 +156,7 @@ namespace Sokoban.Presentation
                     break;
                 
                 case GameplayPhase.Playing:
-                    return TickPlaying(deltaTime);
+                    return TickPlaying(deltaTime, undoRequested);
                 
                 case GameplayPhase.Completed:
                     return TickCompleted(deltaTime);
@@ -170,9 +185,12 @@ namespace Sokoban.Presentation
             });
         }
 
-        private TickResult TickPlaying(float deltaTime)
+        private TickResult TickPlaying(float deltaTime, bool undoRequested)
         {
-            _run.Send(_input.ReadMove());
+            if (undoRequested == false || _run.RequestUndo() == false)
+            {
+                _run.Send(_input.ReadMove());
+            }
             _run.Tick(deltaTime);
             
             if (_run.IsTimedOut)

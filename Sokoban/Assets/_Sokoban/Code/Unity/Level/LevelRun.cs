@@ -21,6 +21,8 @@ namespace Sokoban.Presentation
         
         public LevelResult Result => _simulation.Result;
 
+        public bool CanUndo => ViewStatus == ViewStatus.Ready && _viewLayer.IsMoving == false && _simulation.CanUndo;
+
         public LevelRun(LevelRoot root, LevelDefinition level, IViewProvider provider, ViewFeatures features, LevelPopulator populator, RunOptions options)
         {
             try
@@ -73,6 +75,17 @@ namespace Sokoban.Presentation
 
         public void SetPlayerSkin(SkinId skin) => 
             _viewLayer.SetPlayerSkin(skin);
+
+        public bool RequestUndo()
+        {
+            if (CanUndo == false || _simulation.RequestUndo() == false)
+            {
+                return false;
+            }
+
+            _bufferedMove = default;
+            return true;
+        }
 
         public void Send(MoveCommand command)
         {

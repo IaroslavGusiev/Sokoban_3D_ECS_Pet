@@ -11,6 +11,7 @@ namespace Sokoban.Core
         private readonly Entity _player;
         private readonly Entity _levelState;
         private readonly SystemPipeline _pipeline;
+        private readonly MoveHistory _history = new();
         
         private readonly float _timeLimitSeconds;
 
@@ -19,6 +20,8 @@ namespace Sokoban.Core
         public bool IsTimedOut => _levelState.Has<LevelTimedOutTag>();
 
         public bool IsCompleted => _levelState.Has<LevelCompletedTag>();
+
+        public bool CanUndo => IsCompleted == false && IsTimedOut == false && _history.Entries.Count > 0;
 
         public float RemainingSeconds => _levelState.Get<LevelTimer>().RemainingSeconds;
         
@@ -44,6 +47,7 @@ namespace Sokoban.Core
                 _levelState.Set<LevelStateTag>();
                 _levelState.Set(new LevelTimer(timeLimitSeconds));
                 _levelState.Set(new MoveCount(0));
+                _levelState.Set(_history);
                 
                 _pipeline = new SystemPipeline(World, features);
             }
@@ -62,6 +66,7 @@ namespace Sokoban.Core
             }
             finally
             {
+                _history.Entries.Clear();
                 World.Dispose();
             }
         }
@@ -74,6 +79,17 @@ namespace Sokoban.Core
             }
 
             _player.Set(new MoveRequest(command));
+        }
+
+        public bool RequestUndo()
+        {
+            if (CanUndo == false)
+            {
+                return false;
+            }
+
+            _levelState.Set<UndoRequest>();
+            return true;
         }
         
         public void Tick(float deltaTime)
@@ -89,7 +105,8 @@ namespace Sokoban.Core
         private bool CanAcceptCommand(MoveCommand command)
         {
             return command is MoveCommand.Up or MoveCommand.Down or MoveCommand.Left or MoveCommand.Right
-                   && _player.Has<MoveRequest>() == false && IsCompleted == false && IsTimedOut == false;
+                   && _player.Has<MoveRequest>() == false && _levelState.Has<UndoRequest>() == false
+                   && IsCompleted == false && IsTimedOut == false;
         }
     }
 }

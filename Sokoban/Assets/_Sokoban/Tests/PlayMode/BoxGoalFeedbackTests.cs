@@ -494,6 +494,7 @@ namespace Sokoban.Tests.PlayMode
 
         private sealed class Input : IPlayerInput
         {
+            public bool UndoPressed => false;
             public MoveCommand Move;
             public bool RestartPressed => false;
             public bool NextLevelPressed { get; set; }

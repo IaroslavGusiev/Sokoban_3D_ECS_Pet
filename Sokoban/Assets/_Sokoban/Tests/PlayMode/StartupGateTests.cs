@@ -701,7 +701,11 @@ namespace Sokoban.Tests.PlayMode
             bool pending = player.Has<MoveRequest>();
             int reads = input.Reads;
             float remaining = simulation.RemainingSeconds;
+            Assert.That(controller.CanUndo, Is.False);
+            controller.RequestUndo();
+            input.UndoPressed = true;
             controller.Tick(0.25f);
+            input.UndoPressed = false;
             Assert.That(player.Has<MoveRequest>(), Is.EqualTo(pending));
             Assert.That(player.Get<GridPosition>(), Is.EqualTo(position));
             Assert.That(simulation.RemainingSeconds, Is.EqualTo(remaining));
@@ -864,9 +868,10 @@ namespace Sokoban.Tests.PlayMode
             var source = new Source();
             using var controller = CreateController(new Input(), source, provider, staticData: data);
             controller.Initialize();
-            Assert.That(controller.CanRestart || controller.CanSwitchSkin, Is.False);
+            Assert.That(controller.CanRestart || controller.CanSwitchSkin || controller.CanUndo, Is.False);
             controller.RequestRestart();
             controller.RequestNextSkin();
+            controller.RequestUndo();
             controller.Tick(0f);
             data.Pending.TrySetResult();
             Simulation initial = SimulationOf(controller);
@@ -969,6 +974,134 @@ namespace Sokoban.Tests.PlayMode
             Assert.That(fresh.World.Count(entity => entity.Has<TransformComponent>()), Is.EqualTo(visualCount));
         }
 
+        [Test]
+        public void UndoCommands_CoalesceAndSuppressForwardInputWithoutLoadingViews()
+        {
+            var provider = new Provider();
+            provider.Complete(CreateObject("Prefab"));
+            var input = new Input();
+            using var controller = CreateController(input, new Source(), provider);
+            controller.Initialize();
+            controller.Tick(0f);
+            input.Move = MoveCommand.Right;
+            controller.Tick(0.16f);
+            controller.Tick(0.16f);
+            Simulation simulation = SimulationOf(controller);
+            Entity[] entities = simulation.World.ToArray();
+            int loads = provider.Requests.Count;
+            Assert.That(controller.CanUndo, Is.True);
+            controller.RequestUndo();
+            controller.RequestUndo();
+            input.UndoPressed = true;
+            input.Move = MoveCommand.Up;
+            controller.Tick(0.04f);
+            input.UndoPressed = false;
+            input.Move = default;
+            Assert.That(controller.Moves, Is.EqualTo(1));
+            Assert.That(controller.CanUndo, Is.False);
+            Assert.That(simulation.World.Single(e => e.Has<PlayerTag>()).Get<GridPosition>(), Is.EqualTo(new GridPosition(3, 1)));
+            controller.Tick(0.12f);
+            controller.Tick(0f);
+            Assert.That(controller.Moves, Is.EqualTo(1));
+            Assert.That(controller.CanUndo, Is.True);
+            Assert.That(SimulationOf(controller), Is.SameAs(simulation));
+            Assert.That(simulation.World.ToArray(), Is.EqualTo(entities));
+            Assert.That(provider.Requests.Count, Is.EqualTo(loads));
+        }
+
+        [Test]
+        public void UndoDuringInterpolation_IsDiscardedAndAcceptedUndoClearsTheBufferedForwardMove()
+        {
+            var provider = new Provider();
+            provider.Complete(CreateObject("Prefab"));
+            var input = new Input();
+            using var controller = CreateController(input, new Source(), provider);
+            controller.Initialize();
+            controller.Tick(0f);
+            input.Move = MoveCommand.Right;
+            controller.Tick(0.04f);
+            Assert.That(controller.CanUndo, Is.False);
+            controller.RequestUndo();
+            input.UndoPressed = true;
+            input.Move = MoveCommand.Up;
+            controller.Tick(0.04f);
+            input.UndoPressed = false;
+            input.Move = default;
+            controller.Tick(0.08f);
+            Assert.That(controller.CanUndo, Is.True);
+            Assert.That(controller.Moves, Is.EqualTo(1));
+            controller.RequestUndo();
+            controller.Tick(0.04f);
+            Assert.That(controller.Moves, Is.Zero);
+            controller.Tick(0.12f);
+            controller.Tick(0.16f);
+            Assert.That(SimulationOf(controller).World.Single(e => e.Has<PlayerTag>()).Get<GridPosition>(), Is.EqualTo(new GridPosition(2, 1)));
+            Assert.That(controller.Moves, Is.Zero);
+            Assert.That(controller.RemainingSeconds, Is.EqualTo(59.52f).Within(0.001f));
+        }
+
+        [TestCase(false)]
+        [TestCase(true)]
+        public void RestartAndNextLevel_TakePriorityOverUndoAndReplaceHistory(bool next)
+        {
+            var provider = new Provider();
+            provider.Complete(CreateObject("Prefab"));
+            var source = new Source();
+            var input = new Input();
+            using var controller = CreateController(input, source, provider);
+            controller.Initialize();
+            controller.Tick(0f);
+            input.Move = MoveCommand.Right;
+            controller.Tick(0.16f);
+            input.Move = default;
+            Simulation previous = SimulationOf(controller);
+            Assert.That(controller.CanUndo, Is.True);
+            controller.RequestUndo();
+            input.UndoPressed = true;
+            input.NextLevelPressed = next;
+            input.RestartPressed = !next;
+            controller.Tick(0f);
+            input.UndoPressed = input.NextLevelPressed = input.RestartPressed = false;
+            Assert.That(SimulationOf(controller), Is.Not.SameAs(previous));
+            Assert.That(controller.Moves, Is.Zero);
+            Assert.That(controller.CanUndo, Is.False);
+            controller.Tick(0f);
+            Assert.That(controller.CanUndo, Is.False);
+            Assert.That(controller.Phase, Is.EqualTo(GameplayPhase.Playing));
+            Assert.That(source.Requests, Is.EqualTo(next ? new[] { 0, 1 } : new[] { 0 }));
+        }
+
+        [Test]
+        public void UndoDuringPendingSkinBinding_IsDiscardedRatherThanReplayedAfterBinding()
+        {
+            var provider = new Provider();
+            provider.Complete(CreateObject("Prefab"));
+            var input = new Input();
+            using var controller = CreateController(input, new Source(), provider);
+            controller.Initialize();
+            controller.Tick(0f);
+            input.Move = MoveCommand.Right;
+            controller.Tick(0.16f);
+            input.Move = default;
+            Assert.That(controller.CanUndo, Is.True);
+            provider.Reset();
+            input.NextSkinPressed = true;
+            controller.Tick(0f);
+            input.NextSkinPressed = false;
+            Assert.That(controller.CanUndo, Is.False);
+            controller.RequestUndo();
+            input.UndoPressed = true;
+            controller.Tick(0.25f);
+            input.UndoPressed = false;
+            provider.Complete(CreateObject("New skin"));
+            controller.Tick(0f);
+            Assert.That(controller.Moves, Is.EqualTo(1));
+            Assert.That(controller.CanUndo, Is.True);
+            controller.RequestUndo();
+            controller.Tick(0.16f);
+            Assert.That(controller.Moves, Is.Zero);
+        }
+
         private static void CompleteCurrentLevel(GameplayController controller)
         {
             controller.Tick(0f);
@@ -995,6 +1128,7 @@ namespace Sokoban.Tests.PlayMode
 
         private sealed class Input : IPlayerInput
         {
+            public bool UndoPressed { get; set; }
             public int Reads { get; private set; }
             public MoveCommand Move { get; set; }
             public bool RestartPressed { get; set; }

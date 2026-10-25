@@ -244,6 +244,29 @@ namespace Sokoban.Tests.App
             Assert.That(worldDisposals, Is.EqualTo(1));
         }
 
+        [TestCase(false)]
+        [TestCase(true)]
+        public void Disposal_ClearsHistoryEvenWhenAFeatureThrows(bool disposalFails)
+        {
+            var finalSystem = new TestSystem(_ => { }) { ThrowOnDispose = disposalFails };
+            IFeature[] features = RuleFeatures.Create().Append(new TestFeature(_ => finalSystem)).ToArray();
+            var simulation = new Simulation(CreateLevel(), new LevelPopulator(), 60f, features);
+            simulation.Send(MoveCommand.Left);
+            simulation.Tick(0f);
+            var history = simulation.World.Single(entity => entity.Has<LevelStateTag>()).Get<MoveHistory>();
+            Assert.That(history.Entries.Count, Is.EqualTo(1));
+            int worldDisposals = 0;
+            using var subscription = simulation.World.SubscribeWorldDisposed(_ =>
+            {
+                Assert.That(history.Entries.Count, Is.Zero);
+                worldDisposals++;
+            });
+            if (disposalFails) Assert.Throws<InvalidOperationException>(() => simulation.Dispose());
+            else Assert.DoesNotThrow(() => simulation.Dispose());
+            Assert.That(worldDisposals, Is.EqualTo(1));
+            Assert.That(history.Entries.Count, Is.Zero);
+        }
+
         private static Simulation CreateSimulation(LevelDefinition level) =>
             new Simulation(level, new LevelPopulator(), 60f);
 

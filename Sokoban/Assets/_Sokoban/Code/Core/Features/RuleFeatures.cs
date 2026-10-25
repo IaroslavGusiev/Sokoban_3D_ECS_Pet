@@ -6,11 +6,12 @@ namespace Sokoban.Core
     {
         public static IFeature[] Create() => new IFeature[]
         {
-            new MovementFeature(), // 1
-            new MoveCountFeature(), // 2
-            new GoalTrackingFeature(), // 3
-            new WinFeature(), // 4
-            new LevelTimerFeature(), // 5
+            new UndoFeature(), // 1
+            new MovementFeature(), // 2
+            new MoveCountFeature(), // 3
+            new GoalTrackingFeature(), // 4
+            new WinFeature(), // 5
+            new LevelTimerFeature(), // 6
         };
     }
 }

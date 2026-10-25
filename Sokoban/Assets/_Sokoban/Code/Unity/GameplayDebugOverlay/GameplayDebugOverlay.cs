@@ -75,7 +75,7 @@ namespace Sokoban.Presentation
             
             float width = Mathf.Min(250f, Screen.width - 24f);
             
-            GUILayout.BeginArea(new Rect(Screen.width - width - 12f, 12f, width, 150f));
+            GUILayout.BeginArea(new Rect(Screen.width - width - 12f, 12f, width, 200f));
             GUILayout.BeginVertical("box");
             
             bool isGuiEnabled = GUI.enabled;
@@ -93,6 +93,12 @@ namespace Sokoban.Presentation
                 if (GUILayout.Button("Switch skin (K)", _buttonStyle, GUILayout.Height(52f)))
                 {
                     _commands.RequestNextSkin();
+                }
+
+                GUI.enabled = isGuiEnabled && _commands.CanUndo;
+                if (GUILayout.Button("Undo (Z)", _buttonStyle, GUILayout.Height(52f)))
+                {
+                    _commands.RequestUndo();
                 }
             }
             finally
