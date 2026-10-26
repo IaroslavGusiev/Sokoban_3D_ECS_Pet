@@ -50,7 +50,7 @@ namespace Sokoban.Tests.PlayMode
             Vector3 scale = visual.localScale;
             Vector3 rootPosition = visual.parent.position;
             using var pipeline = Pipeline(world);
-            box.Set(new ViewMove { Duration = 0.16f });
+            box.Set(new ViewMove(default, default, 0.16f));
             world.Publish(new BoxEnteredGoal(box, box.Get<GridPosition>()));
             Assert.That(animator.IsPlaying, Is.False);
             pipeline.Update(0.1f);
@@ -95,7 +95,7 @@ namespace Sokoban.Tests.PlayMode
             Vector3 baseline = visual.localPosition;
             using var pipeline = Pipeline(world);
             GridPosition goal = box.Get<GridPosition>();
-            box.Set(new ViewMove { Duration = 0.16f });
+            box.Set(new ViewMove(default, default, 0.16f));
             world.Publish(new BoxEnteredGoal(box, goal));
             pipeline.Update(0f);
             box.Set(new GridPosition(4, 1));
@@ -120,7 +120,7 @@ namespace Sokoban.Tests.PlayMode
             world.Publish(new BoxEnteredGoal(box, box.Get<GridPosition>()));
             pipeline.Update(0f);
             pipeline.Update(0.05f);
-            if (moving) box.Set(new ViewMove { Duration = 0.16f });
+            if (moving) box.Set(new ViewMove(default, default, 0.16f));
             else box.Set(new GridPosition(4, 1));
             pipeline.Update(0.01f);
             AssertRestored(animator, visual, baseline, scale);
@@ -324,7 +324,7 @@ namespace Sokoban.Tests.PlayMode
             try
             {
                 var factory = new LevelRunFactory(new LevelRoot(parent.transform), provider, new ViewFeatures(), new LevelPopulator());
-                using var controller = new GameplayController(input, source, factory, new TestStaticData { Gameplay = settings });
+                using var controller = new GameplayController(input, source, factory, new TestStaticData { Gameplay = settings }, new HintService(new HintSolver()));
                 controller.Initialize();
                 controller.Tick(0f);
                 input.Move = MoveCommand.Right;

@@ -15,9 +15,10 @@ namespace Sokoban.Core
         public bool IsCompleted { get; }
         public bool IsTimedOut { get; }
         public bool CanUndo { get; }
+        public long BoardRevision { get; }
 
         internal GameplaySnapshot(GridPosition playerPosition, IEnumerable<GridPosition> boxes, LevelResult result,
-            bool isCompleted, bool isTimedOut, bool canUndo)
+            bool isCompleted, bool isTimedOut, bool canUndo, long boardRevision)
         {
             PlayerPosition = playerPosition;
             BoxPositions = Array.AsReadOnly(boxes.OrderBy(position => position.X).ThenBy(position => position.Y).ToArray());
@@ -27,6 +28,7 @@ namespace Sokoban.Core
             IsCompleted = isCompleted;
             IsTimedOut = isTimedOut;
             CanUndo = canUndo;
+            BoardRevision = boardRevision;
         }
 
         public bool Equals(GameplaySnapshot other) =>
@@ -38,7 +40,8 @@ namespace Sokoban.Core
             && ElapsedSeconds.Equals(other.ElapsedSeconds)
             && IsCompleted == other.IsCompleted
             && IsTimedOut == other.IsTimedOut
-            && CanUndo == other.CanUndo;
+            && CanUndo == other.CanUndo
+            && BoardRevision == other.BoardRevision;
 
         public override bool Equals(object obj) =>
             obj is GameplaySnapshot other && Equals(other);
@@ -54,7 +57,8 @@ namespace Sokoban.Core
                 hash = (hash * 397) ^ ElapsedSeconds.GetHashCode();
                 hash = (hash * 397) ^ IsCompleted.GetHashCode();
                 hash = (hash * 397) ^ IsTimedOut.GetHashCode();
-                return (hash * 397) ^ CanUndo.GetHashCode();
+                hash = (hash * 397) ^ CanUndo.GetHashCode();
+                return (hash * 397) ^ BoardRevision.GetHashCode();
             }
         }
     }

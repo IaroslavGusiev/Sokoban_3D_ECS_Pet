@@ -548,7 +548,7 @@ namespace Sokoban.Tests.PlayMode
             GameplaySettings settings = TestGameplaySettings.Create();
             _objects.Add(settings);
             var factory = new LevelRunFactory(new LevelRoot(CreateObject(rootName).transform), CreateViewProvider(), new ViewFeatures(), new LevelPopulator());
-            return new GameplayController(input, source, factory, new TestStaticData { Gameplay = settings });
+            return new GameplayController(input, source, factory, new TestStaticData { Gameplay = settings }, new HintService(new HintSolver()));
         }
 
         private static void SetField(object target, string name, object value) =>

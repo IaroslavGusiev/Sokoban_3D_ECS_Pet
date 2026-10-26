@@ -9,9 +9,23 @@ namespace Sokoban.Presentation
     {
         [FormerlySerializedAs("_levelRoot")]
         [SerializeField] private Transform levelRoot;
+        [SerializeField] private HintArrow hintArrowPrefab;
 
         public override void InstallBindings()
         {
+            Container
+                .Bind<HintSolver>()
+                .AsSingle();
+
+            Container
+                .Bind<IHintService>()
+                .To<HintService>()
+                .AsSingle();
+
+            Container
+                .Bind<HintArrow>()
+                .FromInstance(hintArrowPrefab)
+                .AsSingle();
             Container
                 .Bind<IAddressablesService>()
                 .To<AddressablesService>()

@@ -6,6 +6,8 @@ For implementation use [current architecture](../ARCHITECTURE.md); for running a
 
 | Record | Scope |
 | --- | --- |
+| [Actor-motion split](ACTOR-MOTION.md) | Ordered initialization/detection/advancement systems, immutable ViewMove, and behavior/lifecycle verification. |
+| [Asynchronous hints](ASYNC-HINTS.md) | Bounded worker search, board revisions, stale-result ownership, run-owned arrow, and debug hint controls. |
 | [Core recording and replay](RECORDING-REPLAY.md) | Immutable API-input exports, independent replay ownership, gameplay snapshots, and per-tick verification. |
 | [Run-owned ECS undo](UNDO.md) | Successful-move history, undo gating and snapshot synchronization, debug controls, and verification. |
 | [Core contract resolution](CORE-CONTRACT-RESOLUTION.md) | Approved numeric/overflow guarantees, single-player and pipeline invariants, and the resolution of all 21 baseline failures. |

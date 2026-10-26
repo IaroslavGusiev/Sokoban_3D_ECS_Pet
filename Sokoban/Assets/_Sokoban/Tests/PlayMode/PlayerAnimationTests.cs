@@ -146,7 +146,7 @@ namespace Sokoban.Tests.PlayMode
             animator.Rebind();
             animator.Update(0f);
             using var system = new Sokoban.Presentation.Ecs.Systems.PlayerAnimationSystem(world);
-            player.Set(new ViewMove { Duration = 0.16f, IsPushing = true });
+            player.Set(new ViewMove(default, default, 0.16f, isPushing: true));
             system.Update(0.08f);
             animator.Update(0.08f);
             Assert.That(animator.GetBool("Moving"), Is.True);

@@ -4,6 +4,7 @@ using UnityEngine;
 using Sokoban.Core;
 using System.Threading;
 using Sokoban.Core.Components;
+using Sokoban.Core.Commands;
 using Object = UnityEngine.Object;
 using Sokoban.Presentation.Ecs.Components;
 
@@ -18,6 +19,8 @@ namespace Sokoban.Presentation
         private readonly EntitySet _movingViews;
         private readonly SystemPipeline _pipeline;
         private readonly CancellationTokenSource _cancellation = new();
+        private readonly HintArrow _hintArrowPrefab;
+        private HintArrow _hintArrow;
 
         public ViewStatus Status =>
             _failedViews.Count > 0
@@ -28,8 +31,9 @@ namespace Sokoban.Presentation
 
         public bool IsMoving => _movingViews.Count > 0;
 
-        public ViewLayer(LevelRoot root, World world, IViewProvider provider, ViewFeatures features, RunOptions options)
+        public ViewLayer(LevelRoot root, World world, IViewProvider provider, ViewFeatures features, RunOptions options, HintArrow hintArrowPrefab = null)
         {
+            _hintArrowPrefab = hintArrowPrefab;
             try
             {
                 _root = new GameObject("Level view").transform;
@@ -107,6 +111,17 @@ namespace Sokoban.Presentation
 
         public void Tick(float deltaTime) => 
             _pipeline.Tick(deltaTime);
+
+        public void ShowHint(GridPosition player, MoveCommand move)
+        {
+            if (_hintArrow == null) _hintArrow = Object.Instantiate(_hintArrowPrefab, _root);
+            _hintArrow.Show(player, move);
+        }
+
+        public void HideHint()
+        {
+            if (_hintArrow != null) _hintArrow.gameObject.SetActive(false);
+        }
 
         private void DestroyRoot()
         {

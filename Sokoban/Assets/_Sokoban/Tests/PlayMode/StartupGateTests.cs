@@ -398,7 +398,7 @@ namespace Sokoban.Tests.PlayMode
             var factory = new LevelRunFactory(new LevelRoot(CreateObject("Level root").transform), provider, new ViewFeatures(), new LevelPopulator());
             staticData ??= new TestStaticData();
             staticData.Gameplay = settings;
-            return new GameplayController(input, source, factory, staticData);
+            return new GameplayController(input, source, factory, staticData, new HintService(new HintSolver()));
         }
 
         [Test]

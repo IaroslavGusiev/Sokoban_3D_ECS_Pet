@@ -253,6 +253,43 @@ namespace Sokoban.Tests.PlayMode
         }
 
         [UnityTest]
+        public IEnumerator HintCommand_ShowsAnArrowWithoutMovingAndRestartDisposesIt()
+        {
+            SceneContext context = _scene.GetRootGameObjects().Select(root => root.GetComponent<SceneContext>())
+                .Single(component => component != null);
+            context.Container.Resolve<TickableManager>().Remove(_controller);
+            Simulation simulation = CurrentSimulation;
+            GameplaySnapshot before = simulation.CaptureSnapshot();
+            _controller.RequestHint();
+            _controller.Tick(0f);
+            float deadline = Time.realtimeSinceStartup + 10f;
+            while (_controller.HintStatus == HintStatus.Calculating && Time.realtimeSinceStartup < deadline)
+            {
+                yield return null;
+                _controller.Tick(0f);
+            }
+            Assert.That(_controller.HintStatus, Is.EqualTo(HintStatus.Available));
+            Assert.That(_controller.HintMove, Is.EqualTo(MoveCommand.Left));
+            Assert.That(simulation.CaptureSnapshot(), Is.EqualTo(before));
+            HintArrow arrow = Board.GetComponentInChildren<HintArrow>();
+            Assert.That(arrow, Is.Not.Null);
+            Assert.That(Vector3.Distance(arrow.transform.forward, Vector3.left), Is.LessThan(0.00001f));
+            Assert.That(arrow.GetComponentsInChildren<Collider>(), Is.Empty);
+            Assert.That(Board.childCount, Is.EqualTo(77));
+            Assert.That(simulation.World.Count(), Is.EqualTo(77));
+            simulation.Send(MoveCommand.Left);
+            _controller.Tick(0.16f);
+            Assert.That(arrow.gameObject.activeSelf, Is.False);
+            Assert.That(_controller.HintStatus, Is.EqualTo(HintStatus.None));
+            _controller.RequestRestart();
+            _controller.Tick(0f);
+            Assert.That(Board.childCount, Is.EqualTo(76));
+            yield return null;
+            Assert.That(arrow == null, Is.True);
+            Assert.That(CurrentSimulation, Is.Not.SameAs(simulation));
+        }
+
+        [UnityTest]
         public IEnumerator HeldKey_DoesNotRepeatAndSimultaneousDirectionsKeepPriority()
         {
             InputSystem.QueueStateEvent(_keyboard, new KeyboardState(Key.UpArrow, Key.LeftArrow));

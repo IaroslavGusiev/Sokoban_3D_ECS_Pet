@@ -74,6 +74,7 @@ namespace Sokoban.Core.Systems
             }
 
             entity.Set(new MoveCount(move.PreviousMoveCount));
+            entity.Set(new BoardRevision(entity.Get<BoardRevision>().Value + 1));
             history.Entries.Pop();
         }
 

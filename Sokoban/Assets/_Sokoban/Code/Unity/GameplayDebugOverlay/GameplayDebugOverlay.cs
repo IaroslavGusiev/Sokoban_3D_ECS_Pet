@@ -75,7 +75,7 @@ namespace Sokoban.Presentation
             
             float width = Mathf.Min(250f, Screen.width - 24f);
             
-            GUILayout.BeginArea(new Rect(Screen.width - width - 12f, 12f, width, 200f));
+            GUILayout.BeginArea(new Rect(Screen.width - width - 12f, 12f, width, 320f));
             GUILayout.BeginVertical("box");
             
             bool isGuiEnabled = GUI.enabled;
@@ -100,6 +100,24 @@ namespace Sokoban.Presentation
                 {
                     _commands.RequestUndo();
                 }
+
+                GUI.enabled = isGuiEnabled && _commands.CanHint;
+                string hint = _status.HintStatus == HintStatus.Calculating ? "Calculating…" : "Hint";
+                if (GUILayout.Button(hint, _buttonStyle, GUILayout.Height(52f)))
+                {
+                    _commands.RequestHint();
+                }
+                GUI.enabled = isGuiEnabled;
+                string message = _status.HintStatus switch
+                {
+                    HintStatus.Available => $"Hint: {_status.HintMove}",
+                    HintStatus.NoSolution => "No solution found",
+                    HintStatus.BudgetExhausted => "Search budget exhausted",
+                    HintStatus.Failed => "Calculation failed",
+                    HintStatus.AlreadySolved => "Already solved",
+                    _ => null
+                };
+                if (message != null) GUILayout.Label(message, LabelStyle);
             }
             finally
             {

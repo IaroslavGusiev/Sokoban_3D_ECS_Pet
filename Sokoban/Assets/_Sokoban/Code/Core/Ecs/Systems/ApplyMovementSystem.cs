@@ -25,6 +25,7 @@ namespace Sokoban.Core.Systems
                 .With<LevelStateTag>()
                 .With<MoveHistory>()
                 .With<MoveCount>()
+                .With<BoardRevision>()
                 .AsSet();
         }
 
@@ -64,6 +65,7 @@ namespace Sokoban.Core.Systems
             foreach (Entity level in _levels.GetEntities())
             {
                 level.Get<MoveHistory>().Entries.Push(new CommittedMove(plan, level.Get<MoveCount>().Value));
+                level.Set(new BoardRevision(level.Get<BoardRevision>().Value + 1));
             }
         }
 

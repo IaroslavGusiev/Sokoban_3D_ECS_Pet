@@ -165,6 +165,7 @@ namespace Sokoban.CoreTests
             Assert.That(player.Get<GridPosition>(), Is.EqualTo(playerBefore));
             Assert.That(simulation.Result.Moves, Is.EqualTo(2));
             Assert.That(simulation.CanUndo, Is.True);
+            Assert.That(simulation.BoardRevision, Is.EqualTo(2));
             player.Set(new GridPosition(3, 1));
             player.Enable();
             box.Enable();
@@ -175,6 +176,7 @@ namespace Sokoban.CoreTests
             Assert.That(player.Get<GridPosition>(), Is.EqualTo(new GridPosition(2, 1)));
             Assert.That(box.Get<GridPosition>(), Is.EqualTo(new GridPosition(3, 1)));
             Assert.That(simulation.Result.Moves, Is.EqualTo(1));
+            Assert.That(simulation.BoardRevision, Is.EqualTo(3));
         }
 
         [Test]

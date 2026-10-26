@@ -26,6 +26,8 @@ namespace Sokoban.Core
 
         public bool CanUndo => IsCompleted == false && IsTimedOut == false && _history.Entries.Count > 0;
 
+        public long BoardRevision => _levelState.Get<BoardRevision>().Value;
+
         public float RemainingSeconds => _levelState.Get<LevelTimer>().RemainingSeconds;
         
         public LevelResult Result => new(_levelState.Get<MoveCount>().Value, _timeLimitSeconds - RemainingSeconds, RemainingSeconds);
@@ -57,6 +59,7 @@ namespace Sokoban.Core
                 _levelState.Set<LevelStateTag>();
                 _levelState.Set(new LevelTimer(timeLimitSeconds));
                 _levelState.Set(new MoveCount(0));
+                _levelState.Set(new BoardRevision(0));
                 _levelState.Set(_history);
                 
                 _pipeline = new SystemPipeline(World, features);
@@ -134,7 +137,7 @@ namespace Sokoban.Core
                 .Where(entity => entity.Has<BoxTag>())
                 .Select(entity => entity.Get<GridPosition>());
 
-            return new GameplaySnapshot(playerPosition, positions, Result, IsCompleted, IsTimedOut, CanUndo);
+            return new GameplaySnapshot(playerPosition, positions, Result, IsCompleted, IsTimedOut, CanUndo, BoardRevision);
         }
 
         private bool CanAcceptCommand(MoveCommand command)

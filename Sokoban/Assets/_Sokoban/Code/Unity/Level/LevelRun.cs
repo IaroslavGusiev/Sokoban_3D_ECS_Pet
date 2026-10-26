@@ -8,6 +8,7 @@ namespace Sokoban.Presentation
     {
         private readonly ViewLayer _viewLayer;
         private readonly Simulation _simulation;
+        private readonly LevelDefinition _level;
 
         private MoveCommand _bufferedMove;
 
@@ -23,12 +24,17 @@ namespace Sokoban.Presentation
 
         public bool CanUndo => ViewStatus == ViewStatus.Ready && _viewLayer.IsMoving == false && _simulation.CanUndo;
 
-        public LevelRun(LevelRoot root, LevelDefinition level, IViewProvider provider, ViewFeatures features, LevelPopulator populator, RunOptions options)
+        public bool CanHint => ViewStatus == ViewStatus.Ready && _viewLayer.IsMoving == false && IsCompleted == false && IsTimedOut == false;
+        public long BoardRevision => _simulation.BoardRevision;
+
+        public LevelRun(LevelRoot root, LevelDefinition level, IViewProvider provider, ViewFeatures features, LevelPopulator populator, RunOptions options,
+            HintArrow hintArrowPrefab = null)
         {
+            _level = level;
             try
             {
                 _simulation = new Simulation(level, populator, options.TimeLimitSeconds);
-                _viewLayer = new ViewLayer(root, _simulation.World, provider, features, options);
+                _viewLayer = new ViewLayer(root, _simulation.World, provider, features, options, hintArrowPrefab);
                 _viewLayer.Tick(0f);
             }
             catch
@@ -86,6 +92,18 @@ namespace Sokoban.Presentation
             _bufferedMove = default;
             return true;
         }
+
+        public LevelDefinition CaptureHintBoard()
+        {
+            GameplaySnapshot snapshot = _simulation.CaptureSnapshot();
+            return new LevelDefinition(_level.Width, _level.Height, snapshot.PlayerPosition, _level.Walls, snapshot.BoxPositions, _level.Goals);
+        }
+
+        public void ShowHint(MoveCommand move) =>
+            _viewLayer.ShowHint(_simulation.CaptureSnapshot().PlayerPosition, move);
+
+        public void HideHint() =>
+            _viewLayer.HideHint();
 
         public void Send(MoveCommand command)
         {
