@@ -6,6 +6,7 @@ For implementation use [current architecture](../ARCHITECTURE.md); for running a
 
 | Record | Scope |
 | --- | --- |
+| [Direct system composition](SYSTEM-COMPOSITION.md) | Removal of feature factories, explicit per-run pipelines, meaningful composites, and ownership verification. |
 | [Actor-motion split](ACTOR-MOTION.md) | Ordered initialization/detection/advancement systems, immutable ViewMove, and behavior/lifecycle verification. |
 | [Asynchronous hints](ASYNC-HINTS.md) | Bounded worker search, board revisions, stale-result ownership, run-owned arrow, and debug hint controls. |
 | [Core recording and replay](RECORDING-REPLAY.md) | Immutable API-input exports, independent replay ownership, gameplay snapshots, and per-tick verification. |

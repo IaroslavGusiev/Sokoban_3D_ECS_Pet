@@ -24,7 +24,7 @@ namespace Sokoban.CoreTests
             IReadOnlyList<MoveCommand> moves = solution.Moves;
             TestContext.WriteLine($"{Path.GetFileName(path)}: shortest solution = {moves.Count} moves.");
 
-            using var simulation = new Simulation(level, new LevelPopulator(), 60f);
+            using var simulation = new Simulation(level, new LevelPopulator(), 60f, new SimulationPipelineFactory());
             Assert.That(simulation.IsCompleted, Is.False);
             Entity player = simulation.World.Single(entity => entity.Has<PlayerTag>());
             var snapshots = new List<GameplaySnapshot>();

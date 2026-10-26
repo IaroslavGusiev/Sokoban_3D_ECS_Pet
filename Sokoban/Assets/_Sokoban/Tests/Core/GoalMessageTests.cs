@@ -69,7 +69,7 @@ namespace Sokoban.CoreTests
         {
             var level = new LevelDefinition(5, 3, new GridPosition(1, 1),
                 new[] { new GridPosition(3, 1) }, new[] { new GridPosition(2, 1) }, new[] { new GridPosition(3, 1) });
-            using var simulation = new Simulation(level, new LevelPopulator(), 60f);
+            using var simulation = new Simulation(level, new LevelPopulator(), 60f, new SimulationPipelineFactory());
             int messages = 0;
             using var subscription = simulation.World.Subscribe<BoxEnteredGoal>((in BoxEnteredGoal _) => messages++);
             simulation.Send(MoveCommand.Right);
@@ -80,7 +80,7 @@ namespace Sokoban.CoreTests
         [Test]
         public void WinningArrival_OnExpiryTickStillPublishesAndWins()
         {
-            using var simulation = new Simulation(LevelParser.Parse("#####\n#@$.#\n#####"), new LevelPopulator(), 1f);
+            using var simulation = new Simulation(LevelParser.Parse("#####\n#@$.#\n#####"), new LevelPopulator(), 1f, new SimulationPipelineFactory());
             int messages = 0;
             using var subscription = simulation.World.Subscribe<BoxEnteredGoal>((in BoxEnteredGoal _) => messages++);
             simulation.Send(MoveCommand.Right);
@@ -94,6 +94,6 @@ namespace Sokoban.CoreTests
             new(new LevelDefinition(8, 6, new GridPosition(1, 1), Array.Empty<GridPosition>(),
                 new[] { new GridPosition(2, 1), new GridPosition(0, 4), new GridPosition(1, 4) },
                 new[] { new GridPosition(initiallyOnGoal ? 2 : 3, 1), new GridPosition(initiallyOnGoal ? 3 : 4, 1), new GridPosition(6, 3) }),
-                new LevelPopulator(), 60f);
+                new LevelPopulator(), 60f, new SimulationPipelineFactory());
     }
 }

@@ -547,7 +547,7 @@ namespace Sokoban.Tests.PlayMode
         {
             GameplaySettings settings = TestGameplaySettings.Create();
             _objects.Add(settings);
-            var factory = new LevelRunFactory(new LevelRoot(CreateObject(rootName).transform), CreateViewProvider(), new ViewFeatures(), new LevelPopulator());
+            var factory = new LevelRunFactory(new LevelRoot(CreateObject(rootName).transform), CreateViewProvider(), new LevelPopulator(), new SimulationPipelineFactory(), new ViewPipelineFactory());
             return new GameplayController(input, source, factory, new TestStaticData { Gameplay = settings }, new HintService(new HintSolver()));
         }
 
@@ -643,6 +643,6 @@ namespace Sokoban.Tests.PlayMode
         }
 
         private static Simulation CreateSimulation(LevelDefinition level) =>
-            new Simulation(level, new LevelPopulator(), 60f);
+            new Simulation(level, new LevelPopulator(), 60f, new SimulationPipelineFactory());
     }
 }

@@ -43,7 +43,7 @@ namespace Sokoban.CoreTests
         public void TerminalRulesAndRejectedTerminalRequests_ReplayExactly(string scenario)
         {
             using var source = scenario == "undo expiry" ? Create(1f)
-                : new Simulation(LevelParser.Parse("#####\n#@$.#\n#####"), new LevelPopulator(), 1f);
+                : new Simulation(LevelParser.Parse("#####\n#@$.#\n#####"), new LevelPopulator(), 1f, new SimulationPipelineFactory());
             var ticks = new List<GameplaySnapshot>();
             Tick(source, ticks, 0.25f);
             source.Send(scenario == "timeout" ? MoveCommand.Left : MoveCommand.Right);
@@ -180,7 +180,7 @@ namespace Sokoban.CoreTests
             SimulationRecording later;
             GameplaySnapshot expected;
             Simulation disposed;
-            using (var source = new Simulation(level, new LevelPopulator(), 60f))
+            using (var source = new Simulation(level, new LevelPopulator(), 60f, new SimulationPipelineFactory()))
             {
                 disposed = source;
                 source.Send(MoveCommand.Right);
@@ -214,7 +214,7 @@ namespace Sokoban.CoreTests
         {
             var level = new LevelDefinition(3, 3, new GridPosition(1, 1), Array.Empty<GridPosition>(),
                 new[] { new GridPosition(1, 2) }, new[] { new GridPosition(1, 2) });
-            using var source = new Simulation(level, new LevelPopulator(), 60f);
+            using var source = new Simulation(level, new LevelPopulator(), 60f, new SimulationPipelineFactory());
             SimulationRecording recording = source.ExportRecording();
             Assert.That(recording.Inputs, Is.Empty);
             using var replay = new SimulationReplay(recording);
@@ -264,7 +264,7 @@ namespace Sokoban.CoreTests
                 ? new LevelDefinition(3, 3, new GridPosition(int.MaxValue, 1), Array.Empty<GridPosition>(),
                     new[] { new GridPosition(1, 1) }, new[] { new GridPosition(0, 0) })
                 : LevelParser.Parse("########\n#@-$#-.#\n########");
-            using var source = new Simulation(level, new LevelPopulator(), 60f);
+            using var source = new Simulation(level, new LevelPopulator(), 60f, new SimulationPipelineFactory());
             var ticks = new List<GameplaySnapshot>();
             source.Send(overflow ? MoveCommand.Right : MoveCommand.Left);
             Tick(source, ticks, 0f);
@@ -300,8 +300,8 @@ namespace Sokoban.CoreTests
             var level = new LevelDefinition(4, 3, new GridPosition(0, 1), Array.Empty<GridPosition>(), boxes,
                 new[] { new GridPosition(0, 0), new GridPosition(1, 0), new GridPosition(2, 0) });
             var reversed = new LevelDefinition(4, 3, level.PlayerStart, level.Walls, boxes.Reverse(), level.Goals);
-            using var first = new Simulation(level, new LevelPopulator(), 60f);
-            using var second = new Simulation(reversed, new LevelPopulator(), 60f);
+            using var first = new Simulation(level, new LevelPopulator(), 60f, new SimulationPipelineFactory());
+            using var second = new Simulation(reversed, new LevelPopulator(), 60f, new SimulationPipelineFactory());
             GameplaySnapshot snapshot = first.CaptureSnapshot();
             Assert.That(snapshot.BoxPositions, Is.EqualTo(new[] { new GridPosition(1, 2), new GridPosition(3, 0), new GridPosition(3, 2) }));
             Assert.That(snapshot, Is.EqualTo(second.CaptureSnapshot()));
@@ -338,7 +338,7 @@ namespace Sokoban.CoreTests
         }
 
         private static Simulation Create(float limit = 60f) =>
-            new(LevelParser.Parse("########\n#@-$--.#\n########"), new LevelPopulator(), limit);
+            new(LevelParser.Parse("########\n#@-$--.#\n########"), new LevelPopulator(), limit, new SimulationPipelineFactory());
 
         private static int Bits(float value) => BitConverter.ToInt32(BitConverter.GetBytes(value), 0);
 

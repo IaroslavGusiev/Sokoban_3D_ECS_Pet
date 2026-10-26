@@ -21,7 +21,7 @@ namespace Sokoban.CoreTests
             LevelDefinition level = LevelParser.Parse(File.ReadAllText(path));
             int expectedMoves = LevelSolver.Solve(level).Moves.Count;
             var solver = new HintSolver();
-            using var simulation = new Simulation(level, new LevelPopulator(), 60f);
+            using var simulation = new Simulation(level, new LevelPopulator(), 60f, new SimulationPipelineFactory());
             for (var index = 0; index < expectedMoves; index++)
             {
                 GameplaySnapshot snapshot = simulation.CaptureSnapshot();

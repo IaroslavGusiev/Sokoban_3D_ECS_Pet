@@ -342,7 +342,7 @@ namespace Sokoban.Tests.PlayMode
             var root = CreateObject("Hint run root").transform;
             var prefab = CreateObject("HintArrow prefab").AddComponent<HintArrow>();
             prefab.gameObject.SetActive(false);
-            var factory = new LevelRunFactory(new LevelRoot(root), provider, new ViewFeatures(), new LevelPopulator(), prefab);
+            var factory = new LevelRunFactory(new LevelRoot(root), provider, new LevelPopulator(), new SimulationPipelineFactory(), new ViewPipelineFactory(), prefab);
             GameplaySettings settings = TestGameplaySettings.Create(limit);
             _objects.Add(settings);
             level ??= LevelParser.Parse("########\n#@-$--.#\n########");

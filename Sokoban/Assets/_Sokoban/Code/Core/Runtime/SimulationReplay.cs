@@ -15,7 +15,8 @@ namespace Sokoban.Core
         public SimulationReplay(SimulationRecording recording)
         {
             _recording = recording ?? throw new ArgumentNullException(nameof(recording));
-            _simulation = new Simulation(recording.InitialLevel, new LevelPopulator(), recording.TimeLimitSeconds, RuleFeatures.Create());
+            _simulation = new Simulation(recording.InitialLevel, new LevelPopulator(), recording.TimeLimitSeconds,
+                new SimulationPipelineFactory().Create, recordInputs: false);
         }
 
         public bool Step()

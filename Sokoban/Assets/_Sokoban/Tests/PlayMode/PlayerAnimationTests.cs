@@ -34,7 +34,7 @@ namespace Sokoban.Tests.PlayMode
         [Test]
         public void Push_UsesTheSameVisualProgressForPlayerAndBox()
         {
-            using var simulation = new Simulation(Level, new LevelPopulator(), 60f);
+            using var simulation = new Simulation(Level, new LevelPopulator(), 60f, new SimulationPipelineFactory());
             using var views = CreateViews(simulation);
             views.Tick(0f);
             Entity player = simulation.World.Single(e => e.Has<PlayerTag>());
@@ -65,7 +65,7 @@ namespace Sokoban.Tests.PlayMode
         public void BlockedMove_DoesNotStartMotionOrChangeFacing(bool push)
         {
             var level = push ? LevelParser.Parse("########\n#@$$-..#\n########") : Level;
-            using var simulation = new Simulation(level, new LevelPopulator(), 60f);
+            using var simulation = new Simulation(level, new LevelPopulator(), 60f, new SimulationPipelineFactory());
             using var views = CreateViews(simulation);
             views.Tick(0f);
             Entity player = simulation.World.Single(e => e.Has<PlayerTag>());
@@ -84,7 +84,7 @@ namespace Sokoban.Tests.PlayMode
             GameplaySettings settings = TestGameplaySettings.Create();
             _objects.Add(settings);
             using var run = new LevelRun(new LevelRoot(CreateObject("Root").transform), Level,
-                new Provider(CreateObject("Prefab")), new ViewFeatures(), new LevelPopulator(),
+                new Provider(CreateObject("Prefab")), new LevelPopulator(), new SimulationPipelineFactory(), new ViewPipelineFactory(),
                 new RunOptions(SkinId.Default, settings.LevelTimeLimitSeconds, settings.MoveDurationSeconds));
             var simulation = (Simulation)typeof(LevelRun).GetField("_simulation", BindingFlags.Instance | BindingFlags.NonPublic).GetValue(run);
             Entity player = simulation.World.Single(e => e.Has<PlayerTag>());
@@ -106,7 +106,7 @@ namespace Sokoban.Tests.PlayMode
         [UnityTest]
         public IEnumerator SkinSwap_DuringPushRetainsVisualProgressAndDoesNotRestartMovement()
         {
-            using var simulation = new Simulation(LevelParser.Parse("#####\n#@$.#\n#####"), new LevelPopulator(), 60f);
+            using var simulation = new Simulation(LevelParser.Parse("#####\n#@$.#\n#####"), new LevelPopulator(), 60f, new SimulationPipelineFactory());
             using var views = CreateViews(simulation);
             views.Tick(0f);
             Entity player = simulation.World.Single(e => e.Has<PlayerTag>());
@@ -165,7 +165,7 @@ namespace Sokoban.Tests.PlayMode
 #endif
 
         private ViewLayer CreateViews(Simulation simulation) => new(new LevelRoot(CreateObject("Root").transform),
-            simulation.World, new Provider(CreateObject("Prefab")), new ViewFeatures(), new RunOptions(SkinId.Default, 60f, 0.16f));
+            simulation.World, new Provider(CreateObject("Prefab")), new ViewPipelineFactory(), new RunOptions(SkinId.Default, 60f, 0.16f));
 
         private GameObject CreateObject(string name)
         {

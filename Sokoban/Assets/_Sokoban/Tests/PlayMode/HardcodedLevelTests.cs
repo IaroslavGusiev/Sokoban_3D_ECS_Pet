@@ -56,6 +56,10 @@ namespace Sokoban.Tests.PlayMode
             yield return null;
             SceneContext context = _scene.GetRootGameObjects().Select(root => root.GetComponent<SceneContext>())
                 .Single(component => component != null);
+            Assert.That(context.Container.Resolve<SimulationPipelineFactory>(),
+                Is.SameAs(context.Container.Resolve<SimulationPipelineFactory>()));
+            Assert.That(context.Container.Resolve<ViewPipelineFactory>(),
+                Is.SameAs(context.Container.Resolve<ViewPipelineFactory>()));
             ITickable tickable = context.Container.ResolveAll<ITickable>().Single();
             Assert.That(tickable, Is.TypeOf<GameplayController>());
             _controller = context.Container.Resolve<GameplayController>();

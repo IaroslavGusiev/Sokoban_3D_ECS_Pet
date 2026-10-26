@@ -31,7 +31,7 @@ namespace Sokoban.Presentation
 
         public bool IsMoving => _movingViews.Count > 0;
 
-        public ViewLayer(LevelRoot root, World world, IViewProvider provider, ViewFeatures features, RunOptions options, HintArrow hintArrowPrefab = null)
+        public ViewLayer(LevelRoot root, World world, IViewProvider provider, ViewPipelineFactory pipelineFactory, RunOptions options, HintArrow hintArrowPrefab = null)
         {
             _hintArrowPrefab = hintArrowPrefab;
             try
@@ -62,7 +62,7 @@ namespace Sokoban.Presentation
                 }
                 
                 var context = new ViewContext(_root, provider, _cancellation.Token, options.MoveDurationSeconds);
-                _pipeline = new SystemPipeline(world, features.Create(context));
+                _pipeline = pipelineFactory.Create(world, context);
             }
             catch
             {

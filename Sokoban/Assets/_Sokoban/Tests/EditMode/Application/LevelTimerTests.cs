@@ -141,9 +141,9 @@ namespace Sokoban.Tests.App
         {
             var populator = new LevelPopulator();
             LevelDefinition level = LevelParser.Parse("#####\n#@$.#\n#####");
-            using var expired = new Simulation(level, populator, 1f);
+            using var expired = new Simulation(level, populator, 1f, new SimulationPipelineFactory());
             expired.Tick(1f);
-            using var fresh = new Simulation(level, populator, 3f);
+            using var fresh = new Simulation(level, populator, 3f, new SimulationPipelineFactory());
             fresh.Tick(0.5f);
             Assert.That(fresh.World, Is.Not.SameAs(expired.World));
             Assert.That(fresh.RemainingSeconds, Is.EqualTo(2.5f));
@@ -193,6 +193,6 @@ namespace Sokoban.Tests.App
         }
 
         private static Simulation Create(float duration) =>
-            new(LevelParser.Parse("#####\n#@$.#\n#####"), new LevelPopulator(), duration);
+            new(LevelParser.Parse("#####\n#@$.#\n#####"), new LevelPopulator(), duration, new SimulationPipelineFactory());
     }
 }

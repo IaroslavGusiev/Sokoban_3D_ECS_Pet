@@ -32,10 +32,10 @@ namespace Sokoban.Core
         
         public LevelResult Result => new(_levelState.Get<MoveCount>().Value, _timeLimitSeconds - RemainingSeconds, RemainingSeconds);
 
-        public Simulation(LevelDefinition level, LevelPopulator populator, float timeLimitSeconds)
-            : this(level, populator, timeLimitSeconds, RuleFeatures.Create(), recordInputs: true) { }
+        public Simulation(LevelDefinition level, LevelPopulator populator, float timeLimitSeconds, SimulationPipelineFactory pipelineFactory)
+            : this(level, populator, timeLimitSeconds, pipelineFactory.Create, recordInputs: true) { }
 
-        internal Simulation(LevelDefinition level, LevelPopulator populator, float timeLimitSeconds, IReadOnlyList<IFeature> features, bool recordInputs = false)
+        internal Simulation(LevelDefinition level, LevelPopulator populator, float timeLimitSeconds, Func<World, SystemPipeline> createPipeline, bool recordInputs = false)
         {
             if (float.IsNaN(timeLimitSeconds) || float.IsInfinity(timeLimitSeconds) || timeLimitSeconds <= 0f)
             {
@@ -62,7 +62,7 @@ namespace Sokoban.Core
                 _levelState.Set(new BoardRevision(0));
                 _levelState.Set(_history);
                 
-                _pipeline = new SystemPipeline(World, features);
+                _pipeline = createPipeline(World);
             }
             catch
             {

@@ -4,7 +4,7 @@ Reference inventory; use [architecture](ARCHITECTURE.md) for current boundaries 
 
 Source inventory updated on 2026-10-24 for public actor-motion tests; the resolved-package inventory remains the 2026-10-22 snapshot. Assembly names are read from the JSON name field, not inferred from filenames. Library entries are generated package-cache inputs, listed separately from source/vendored files.
 
-Friendship audit after ECS-driven view binding: Core keeps Sokoban.EditModeTests (internal movement systems) and Sokoban.App.EditModeTests (internal Simulation constructor and MovementFeature). Sokoban.PlayModeTests exists but no longer uses Core internals, so its friend entry was removed. No nonexistent friend entries were present. String-address migration adds Sokoban.Editor and Sokoban.Editor.Tests, both Editor-only; existing assemblies and Core friendship are unchanged.
+Core keeps Sokoban.EditModeTests (internal movement systems and solver observation) and Sokoban.App.EditModeTests (internal Simulation composition seam and MovementSystem). Sokoban.PlayModeTests uses public Core APIs, so its Core friend entry remains removed. String-address migration added Sokoban.Editor and Sokoban.Editor.Tests, both Editor-only. Removing feature factories changes no assembly or friend declaration.
 
 Sokoban.Editor.Tests now also contains public actor-motion/projection tests. Its references include Sokoban.Core and Sokoban.Unity, with overrideReferences enabled and explicit DefaultEcs.dll/nunit.framework.dll references. Existing Core friend declarations are unchanged; no asmdef was added.
 

@@ -27,14 +27,15 @@ namespace Sokoban.Presentation
         public bool CanHint => ViewStatus == ViewStatus.Ready && _viewLayer.IsMoving == false && IsCompleted == false && IsTimedOut == false;
         public long BoardRevision => _simulation.BoardRevision;
 
-        public LevelRun(LevelRoot root, LevelDefinition level, IViewProvider provider, ViewFeatures features, LevelPopulator populator, RunOptions options,
+        public LevelRun(LevelRoot root, LevelDefinition level, IViewProvider provider, LevelPopulator populator,
+            SimulationPipelineFactory simulationPipelineFactory, ViewPipelineFactory viewPipelineFactory, RunOptions options,
             HintArrow hintArrowPrefab = null)
         {
             _level = level;
             try
             {
-                _simulation = new Simulation(level, populator, options.TimeLimitSeconds);
-                _viewLayer = new ViewLayer(root, _simulation.World, provider, features, options, hintArrowPrefab);
+                _simulation = new Simulation(level, populator, options.TimeLimitSeconds, simulationPipelineFactory);
+                _viewLayer = new ViewLayer(root, _simulation.World, provider, viewPipelineFactory, options, hintArrowPrefab);
                 _viewLayer.Tick(0f);
             }
             catch

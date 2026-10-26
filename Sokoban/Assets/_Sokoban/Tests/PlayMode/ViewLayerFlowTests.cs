@@ -157,7 +157,7 @@ namespace Sokoban.Tests.PlayMode
             }
             GameObject parent = CreateObject("Flow root");
             parent.transform.position = new Vector3(10, 4, -5);
-            var layer = new ViewLayer(new LevelRoot(parent.transform), world, provider, new ViewFeatures(), new RunOptions(SkinId.Default, 60f, 0.16f));
+            var layer = new ViewLayer(new LevelRoot(parent.transform), world, provider, new ViewPipelineFactory(), new RunOptions(SkinId.Default, 60f, 0.16f));
             _layers.Add(layer);
             return (layer, entities.ToArray(), parent.transform.GetChild(0));
         }
@@ -286,9 +286,9 @@ namespace Sokoban.Tests.PlayMode
         {
             GameObject prefab = CreateSkinPrefab("Skin");
             var level = Sokoban.Core.LevelParser.Parse("#####\n#@$.#\n#####");
-            using var simulation = new Sokoban.Core.Simulation(level, new Sokoban.Core.LevelPopulator(), 60f);
+            using var simulation = new Sokoban.Core.Simulation(level, new Sokoban.Core.LevelPopulator(), 60f, new Sokoban.Core.SimulationPipelineFactory());
             using var layer = new ViewLayer(new LevelRoot(CreateObject("Simulation root").transform), simulation.World,
-                new FakeViewProvider(_ => prefab), new ViewFeatures(), new RunOptions(SkinId.Default, 60f, 0.16f));
+                new FakeViewProvider(_ => prefab), new ViewPipelineFactory(), new RunOptions(SkinId.Default, 60f, 0.16f));
             var before = new Dictionary<Entity, GridPosition>();
             Entity levelState = default;
             foreach (Entity entity in simulation.World)

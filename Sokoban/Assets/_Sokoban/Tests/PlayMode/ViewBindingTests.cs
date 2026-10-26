@@ -81,7 +81,7 @@ namespace Sokoban.Tests.PlayMode
             entity.Set(new GridPosition(2, 3));
             var provider = new PendingProvider();
             Transform root = CreateObject("Level root").transform;
-            var layer = new ViewLayer(new LevelRoot(root), world, provider, new ViewFeatures(), new RunOptions(SkinId.Default, 60f, 0.16f));
+            var layer = new ViewLayer(new LevelRoot(root), world, provider, new ViewPipelineFactory(), new RunOptions(SkinId.Default, 60f, 0.16f));
             layer.Tick(0f);
             Assert.That(entity.Has<ViewPending>(), Is.True);
             layer.Dispose();

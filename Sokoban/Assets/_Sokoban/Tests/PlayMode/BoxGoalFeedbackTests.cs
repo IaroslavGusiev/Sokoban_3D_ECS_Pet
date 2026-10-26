@@ -41,6 +41,36 @@ namespace Sokoban.Tests.PlayMode
         }
 
         [Test]
+        public void DisabledComposite_BuffersArrivalAndPausesActiveFeedbackUntilReenabled()
+        {
+            using var world = new World();
+            Entity box = Box(world);
+            BoxGoalAnimator animator = Bind(box, out Transform visual);
+            Vector3 baseline = visual.localPosition;
+            Vector3 scale = visual.localScale;
+            using var pipeline = Pipeline(world);
+            Assert.That(pipeline.IsEnabled, Is.True);
+            pipeline.IsEnabled = false;
+            world.Publish(new BoxEnteredGoal(box, box.Get<GridPosition>()));
+            pipeline.Update(0.05f);
+            Assert.That(animator.IsPlaying, Is.False);
+            Assert.That(visual.localPosition, Is.EqualTo(baseline));
+            pipeline.IsEnabled = true;
+            pipeline.Update(0f);
+            Assert.That(animator.IsPlaying, Is.True);
+            pipeline.Update(0.055f);
+            Vector3 position = visual.localPosition;
+            Assert.That(position.y, Is.GreaterThan(baseline.y));
+            pipeline.IsEnabled = false;
+            pipeline.Update(0.3f);
+            Assert.That(animator.IsPlaying, Is.True);
+            Assert.That(visual.localPosition, Is.EqualTo(position));
+            pipeline.IsEnabled = true;
+            pipeline.Update(0.22f);
+            AssertRestored(animator, visual, baseline, scale);
+        }
+
+        [Test]
         public void Message_IsBufferedUntilMovementFinishesAndVisualRestoresItsAuthoredPose()
         {
             using var world = new World();
@@ -288,7 +318,10 @@ namespace Sokoban.Tests.PlayMode
             var provider = new Provider(boxPrefab, fallback);
             var options = new RunOptions(SkinId.Default, 60f, 0.16f);
             LevelDefinition level = LevelParser.Parse("#####\n#@$.#\n#####");
-            var run = new LevelRun(new LevelRoot(parent.transform), level, provider, new ViewFeatures(), new LevelPopulator(), options);
+            var simulationPipelineFactory = new SimulationPipelineFactory();
+            var viewPipelineFactory = new ViewPipelineFactory();
+            var run = new LevelRun(new LevelRoot(parent.transform), level, provider, new LevelPopulator(),
+                simulationPipelineFactory, viewPipelineFactory, options);
             run.Send(MoveCommand.Right);
             run.Tick(0.16f);
             run.TickView(0.05f);
@@ -300,7 +333,8 @@ namespace Sokoban.Tests.PlayMode
             Assert.That(Tween.GetTweensCount(visual), Is.GreaterThan(0));
             run.Dispose();
             AssertRestored(animator, visual, baseline, scale);
-            using var replacement = new LevelRun(new LevelRoot(parent.transform), level, provider, new ViewFeatures(), new LevelPopulator(), options);
+            using var replacement = new LevelRun(new LevelRoot(parent.transform), level, provider, new LevelPopulator(),
+                simulationPipelineFactory, viewPipelineFactory, options);
             replacement.TickView(0.1f);
             var nextAnimator = parent.GetComponentInChildren<BoxGoalAnimator>();
             Assert.That(nextAnimator, Is.Not.SameAs(animator));
@@ -309,8 +343,8 @@ namespace Sokoban.Tests.PlayMode
             Assert.That(nextAnimator.IsPlaying, Is.False);
         }
 
-        private static SequentialSystem<float> Pipeline(World world) =>
-            new(new BoxGoalFeedbackLifecycleSystem(world), new BoxGoalFeedbackSystem(world));
+        private static ISystem<float> Pipeline(World world) =>
+            new BoxGoalFeedbackCompositeSystem(world);
 
         [UnityTest]
         public IEnumerator ControllerLoading_PausesFeedbackUntilTheRetainedRunIsReplaced()
@@ -323,7 +357,7 @@ namespace Sokoban.Tests.PlayMode
             GameplaySettings settings = TestGameplaySettings.Create(completionDelay: 10f);
             try
             {
-                var factory = new LevelRunFactory(new LevelRoot(parent.transform), provider, new ViewFeatures(), new LevelPopulator());
+                var factory = new LevelRunFactory(new LevelRoot(parent.transform), provider, new LevelPopulator(), new SimulationPipelineFactory(), new ViewPipelineFactory());
                 using var controller = new GameplayController(input, source, factory, new TestStaticData { Gameplay = settings }, new HintService(new HintSolver()));
                 controller.Initialize();
                 controller.Tick(0f);

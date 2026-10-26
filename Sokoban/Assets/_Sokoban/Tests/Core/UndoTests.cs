@@ -60,7 +60,7 @@ namespace Sokoban.CoreTests
         [Test]
         public void BlockedAndInvalidMoves_DoNotReplaceTheLatestSuccessfulHistoryEntry()
         {
-            using var simulation = new Simulation(LevelParser.Parse("########\n#@-$#-.#\n########"), new LevelPopulator(), 60f);
+            using var simulation = new Simulation(LevelParser.Parse("########\n#@-$#-.#\n########"), new LevelPopulator(), 60f, new SimulationPipelineFactory());
             Step(simulation, MoveCommand.Left);
             Step(simulation, (MoveCommand)99);
             Assert.That(simulation.CanUndo, Is.False);
@@ -78,7 +78,7 @@ namespace Sokoban.CoreTests
         {
             var level = new LevelDefinition(3, 3, new GridPosition(int.MaxValue, 1), Array.Empty<GridPosition>(),
                 new[] { new GridPosition(1, 1) }, new[] { new GridPosition(0, 0) });
-            using var simulation = new Simulation(level, new LevelPopulator(), 60f);
+            using var simulation = new Simulation(level, new LevelPopulator(), 60f, new SimulationPipelineFactory());
             Step(simulation, MoveCommand.Right);
             Assert.That(simulation.CanUndo, Is.False);
             Step(simulation, MoveCommand.Left);
@@ -182,7 +182,7 @@ namespace Sokoban.CoreTests
         [Test]
         public void UndoReturningBoxToGoal_SuppressesArrivalAndResynchronizesTheNextForwardArrival()
         {
-            using var simulation = new Simulation(LevelParser.Parse("#########\n#@$..-$-#\n#########"), new LevelPopulator(), 60f);
+            using var simulation = new Simulation(LevelParser.Parse("#########\n#@$..-$-#\n#########"), new LevelPopulator(), 60f, new SimulationPipelineFactory());
             var arrivals = new List<GridPosition>();
             using var subscription = simulation.World.Subscribe<BoxEnteredGoal>((in BoxEnteredGoal message) => arrivals.Add(message.Goal));
             Step(simulation, MoveCommand.Right);
@@ -200,7 +200,7 @@ namespace Sokoban.CoreTests
         public void TerminalAttempts_RejectUndo(bool completed)
         {
             using var simulation = completed
-                ? new Simulation(LevelParser.Parse("#####\n#@$.#\n#####"), new LevelPopulator(), 1f)
+                ? new Simulation(LevelParser.Parse("#####\n#@$.#\n#####"), new LevelPopulator(), 1f, new SimulationPipelineFactory())
                 : Create();
             Step(simulation, MoveCommand.Right);
             if (completed == false)
@@ -230,7 +230,7 @@ namespace Sokoban.CoreTests
         }
 
         private static Simulation Create() =>
-            new(LevelParser.Parse("########\n#@-$--.#\n########"), new LevelPopulator(), 60f);
+            new(LevelParser.Parse("########\n#@-$--.#\n########"), new LevelPopulator(), 60f, new SimulationPipelineFactory());
 
         private static Entity Player(Simulation simulation) => simulation.World.Single(entity => entity.Has<PlayerTag>());
         private static Entity Box(Simulation simulation) => simulation.World.Single(entity => entity.Has<BoxTag>());

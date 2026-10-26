@@ -43,7 +43,7 @@ namespace Sokoban.Tests.PlayMode
             Entity ignored = world.CreateEntity();
             ignored.Set(new GridPosition(3, 4));
             var provider = new Provider();
-            using var layer = new ViewLayer(new LevelRoot(CreateObject("Root").transform), world, provider, new ViewFeatures(), new RunOptions(SkinId.Default, 60f, 0.16f));
+            using var layer = new ViewLayer(new LevelRoot(CreateObject("Root").transform), world, provider, new ViewPipelineFactory(), new RunOptions(SkinId.Default, 60f, 0.16f));
             Assert.That(floor.Has<ViewPending>(), Is.False);
             Assert.That(layer.Status, Is.EqualTo(ViewStatus.Binding));
             ignored.Set<ViewFailed>();
@@ -395,7 +395,7 @@ namespace Sokoban.Tests.PlayMode
         {
             GameplaySettings settings = TestGameplaySettings.Create(timeLimitSeconds, completionDelay, moveDuration);
             _objects.Add(settings);
-            var factory = new LevelRunFactory(new LevelRoot(CreateObject("Level root").transform), provider, new ViewFeatures(), new LevelPopulator());
+            var factory = new LevelRunFactory(new LevelRoot(CreateObject("Level root").transform), provider, new LevelPopulator(), new SimulationPipelineFactory(), new ViewPipelineFactory());
             staticData ??= new TestStaticData();
             staticData.Gameplay = settings;
             return new GameplayController(input, source, factory, staticData, new HintService(new HintSolver()));

@@ -19,9 +19,7 @@ namespace Sokoban.Tests.EditMode
         {
             _world = new World();
             _player = Create<PlayerTag>(0, 0);
-            _movement = new SequentialSystem<float>(
-                new MovementValidationSystem(_world),
-                new ApplyMovementSystem(_world));
+            _movement = new MovementSystem(_world);
         }
 
         [TearDown]

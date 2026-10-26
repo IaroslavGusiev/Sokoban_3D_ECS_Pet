@@ -11,7 +11,7 @@ namespace Sokoban.CoreTests
         [Test]
         public void WalkPushAndUndo_AdvanceRevisionEvenWhenReturningToIdenticalPositions()
         {
-            using var simulation = new Simulation(LevelParser.Parse("#######\n#@-$-.#\n#######"), new LevelPopulator(), 60f);
+            using var simulation = new Simulation(LevelParser.Parse("#######\n#@-$-.#\n#######"), new LevelPopulator(), 60f, new SimulationPipelineFactory());
             GameplaySnapshot initial = simulation.CaptureSnapshot();
             Assert.That(simulation.BoardRevision, Is.Zero);
             simulation.Send(MoveCommand.Right);
@@ -40,7 +40,7 @@ namespace Sokoban.CoreTests
         {
             var level = new LevelDefinition(3, 3, new GridPosition(int.MaxValue, 1), Array.Empty<GridPosition>(),
                 new[] { new GridPosition(1, 1) }, new[] { new GridPosition(0, 0) });
-            using var simulation = new Simulation(level, new LevelPopulator(), 60f);
+            using var simulation = new Simulation(level, new LevelPopulator(), 60f, new SimulationPipelineFactory());
             simulation.Send(MoveCommand.Right);
             simulation.Tick(0f);
             simulation.Send((MoveCommand)99);

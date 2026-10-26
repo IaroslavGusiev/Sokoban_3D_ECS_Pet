@@ -76,6 +76,6 @@ namespace Sokoban.CoreTests
         }
 
         private static Simulation Create() =>
-            new(LevelParser.Parse("#######\n#@-$-.#\n#######"), new LevelPopulator(), 3f);
+            new(LevelParser.Parse("#######\n#@-$-.#\n#######"), new LevelPopulator(), 3f, new SimulationPipelineFactory());
     }
 }

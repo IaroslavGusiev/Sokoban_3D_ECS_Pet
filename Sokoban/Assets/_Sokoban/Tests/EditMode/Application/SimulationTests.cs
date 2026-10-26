@@ -4,7 +4,8 @@ using System.Linq;
 using DefaultEcs;
 using DefaultEcs.System;
 using NUnit.Framework;
-using Sokoban.Core.Features;
+using Sokoban.Core.Systems;
+using System.Collections.Generic;
 using Sokoban.Core.Commands;
 using Sokoban.Core.Components;
 
@@ -15,7 +16,7 @@ namespace Sokoban.Tests.App
         [Test]
         public void PushingOnlyBoxOntoGoal_CompletesOnceAfterMovement()
         {
-            using var simulation = new Simulation(LevelParser.Parse("#####\n#@$.#\n#####"), new LevelPopulator(), 60f);
+            using var simulation = new Simulation(LevelParser.Parse("#####\n#@$.#\n#####"), new LevelPopulator(), 60f, new SimulationPipelineFactory());
             Entity player = simulation.World.Single(entity => entity.Has<PlayerTag>());
             Entity levelState = simulation.World.Single(entity => entity.Has<LevelStateTag>());
             int completions = 0;
@@ -41,7 +42,7 @@ namespace Sokoban.Tests.App
         [Test]
         public void TwoBoxes_RequireBothGoalsToBeCovered()
         {
-            using var simulation = new Simulation(LevelParser.Parse("#######\n#@$.--#\n#--$.-#\n#######"), new LevelPopulator(), 60f);
+            using var simulation = new Simulation(LevelParser.Parse("#######\n#@$.--#\n#--$.-#\n#######"), new LevelPopulator(), 60f, new SimulationPipelineFactory());
             simulation.Send(MoveCommand.Right);
             simulation.Tick(0f);
             Assert.That(simulation.IsCompleted, Is.False);
@@ -77,8 +78,9 @@ namespace Sokoban.Tests.App
         {
             LevelDefinition level = CreateLevel();
             var populator = new LevelPopulator();
-            using (var first = new Simulation(level, populator, 60f))
-            using (var second = new Simulation(level, populator, 60f))
+            var pipelineFactory = new SimulationPipelineFactory();
+            using (var first = new Simulation(level, populator, 60f, pipelineFactory))
+            using (var second = new Simulation(level, populator, 60f, pipelineFactory))
             {
                 Assert.That(first.World.First().World, Is.Not.SameAs(second.World.First().World));
                 first.Send(MoveCommand.Left);
@@ -123,10 +125,11 @@ namespace Sokoban.Tests.App
         public void DisposedSimulation_CannotExposeAReplacementWorld()
         {
             var populator = new LevelPopulator();
-            var previous = new Simulation(CreateLevel(), populator, 60f);
+            var pipelineFactory = new SimulationPipelineFactory();
+            var previous = new Simulation(CreateLevel(), populator, 60f, pipelineFactory);
             World oldWorld = previous.World;
             previous.Dispose();
-            using var replacement = new Simulation(CreateLevel(), populator, 60f);
+            using var replacement = new Simulation(CreateLevel(), populator, 60f, pipelineFactory);
             Assert.That(replacement.World, Is.Not.SameAs(oldWorld));
             replacement.Send(MoveCommand.Left);
             replacement.Tick(0f);
@@ -195,49 +198,93 @@ namespace Sokoban.Tests.App
         }
 
         [Test]
-        public void ComposedFeatures_RunInListOrderBeforeAndAfterMovement()
+        public void ComposedSystems_RunInListOrderBeforeAndAfterMovement()
         {
             int phase = 0;
-            var input = new TestFeature(world => new TestSystem(deltaTime =>
+            IEnumerable<ISystem<float>> Compose(World world)
             {
-                Assert.That(deltaTime, Is.EqualTo(0.25f));
-                Assert.That(phase++, Is.Zero);
-                world.Single(entity => entity.Has<PlayerTag>()).Set(new MoveRequest(MoveCommand.Left));
-            }));
-            var output = new TestFeature(world => new TestSystem(_ =>
-            {
-                Assert.That(phase++, Is.EqualTo(1));
-                Assert.That(world.Single(entity => entity.Has<PlayerTag>()).Get<GridPosition>(), Is.EqualTo(new GridPosition(2, 2)));
-            }));
-            using var simulation = new Simulation(CreateLevel(), new LevelPopulator(), 60f, new IFeature[] { input, new MovementFeature(), output });
+                yield return new TestSystem(deltaTime =>
+                {
+                    Assert.That(deltaTime, Is.EqualTo(0.25f));
+                    Assert.That(phase++, Is.Zero);
+                    world.Single(entity => entity.Has<PlayerTag>()).Set(new MoveRequest(MoveCommand.Left));
+                });
+                yield return new MovementSystem(world);
+                yield return new TestSystem(_ =>
+                {
+                    Assert.That(phase++, Is.EqualTo(1));
+                    Assert.That(world.Single(entity => entity.Has<PlayerTag>()).Get<GridPosition>(), Is.EqualTo(new GridPosition(2, 2)));
+                });
+            }
+            using var simulation = new Simulation(CreateLevel(), new LevelPopulator(), 60f, world => new SystemPipeline(Compose(world)));
             simulation.Tick(0.25f);
             Assert.That(phase, Is.EqualTo(2));
         }
 
         [Test]
-        public void Simulation_DisposesFeaturesExactlyOnceBeforeItsWorld()
+        public void Simulation_DisposesSystemsExactlyOnceInReverseBeforeItsWorld()
         {
-            var first = new TestSystem(_ => { });
-            var last = new TestSystem(_ => { });
-            var simulation = new Simulation(CreateLevel(), new LevelPopulator(), 60f, new IFeature[]
+            var order = new List<string>();
+            var first = new TestSystem(_ => { }) { OnDispose = () => order.Add("first") };
+            var last = new TestSystem(_ => { }) { OnDispose = () => order.Add("last") };
+            IEnumerable<ISystem<float>> Compose(World world)
             {
-                new TestFeature(_ => first), new MovementFeature(), new TestFeature(_ => last)
-            });
+                yield return first;
+                yield return new MovementSystem(world);
+                yield return last;
+            }
+            var simulation = new Simulation(CreateLevel(), new LevelPopulator(), 60f, world => new SystemPipeline(Compose(world)));
             using var subscription = simulation.World.SubscribeWorldDisposed(_ =>
             {
                 Assert.That(first.DisposeCalls, Is.EqualTo(1));
                 Assert.That(last.DisposeCalls, Is.EqualTo(1));
+                Assert.That(order, Is.EqualTo(new[] { "last", "first" }));
+                order.Add("world");
             });
             simulation.Dispose();
             Assert.That(first.DisposeCalls, Is.EqualTo(1));
             Assert.That(last.DisposeCalls, Is.EqualTo(1));
+            Assert.That(order, Is.EqualTo(new[] { "last", "first", "world" }));
+        }
+
+        [Test]
+        public void LaterConstructionFailure_DisposesAcquiredSystemsInReverseBeforeTheWorld()
+        {
+            var order = new List<string>();
+            var first = new TestSystem(_ => { }) { OnDispose = () => order.Add("first") };
+            var last = new TestSystem(_ => { }) { OnDispose = () => order.Add("last") };
+            var failure = new InvalidOperationException("Planned composition failure");
+            IDisposable subscription = null;
+            Entity player = default;
+            IEnumerable<ISystem<float>> Compose(World world)
+            {
+                player = world.Single(entity => entity.Has<PlayerTag>());
+                subscription = world.SubscribeWorldDisposed(_ => order.Add("world"));
+                yield return first;
+                yield return new MovementSystem(world);
+                yield return last;
+                throw failure;
+            }
+            try
+            {
+                Assert.That(Assert.Throws<InvalidOperationException>(() =>
+                    new Simulation(CreateLevel(), new LevelPopulator(), 60f, world => new SystemPipeline(Compose(world)))), Is.SameAs(failure));
+                Assert.That(first.DisposeCalls, Is.EqualTo(1));
+                Assert.That(last.DisposeCalls, Is.EqualTo(1));
+                Assert.That(order, Is.EqualTo(new[] { "last", "first", "world" }));
+                Assert.That(player.World, Is.Null);
+            }
+            finally
+            {
+                subscription?.Dispose();
+            }
         }
 
         [Test]
         public void PipelineDisposalFailure_StillDisposesWorld()
         {
             var system = new TestSystem(_ => { }) { ThrowOnDispose = true };
-            var simulation = new Simulation(CreateLevel(), new LevelPopulator(), 60f, new[] { new TestFeature(_ => system) });
+            var simulation = new Simulation(CreateLevel(), new LevelPopulator(), 60f, _ => new SystemPipeline(new[] { system }));
             int worldDisposals = 0;
             using var subscription = simulation.World.SubscribeWorldDisposed(_ => worldDisposals++);
             Assert.Throws<InvalidOperationException>(() => simulation.Dispose());
@@ -246,11 +293,11 @@ namespace Sokoban.Tests.App
 
         [TestCase(false)]
         [TestCase(true)]
-        public void Disposal_ClearsHistoryEvenWhenAFeatureThrows(bool disposalFails)
+        public void Disposal_ClearsHistoryEvenWhenASystemThrows(bool disposalFails)
         {
             var finalSystem = new TestSystem(_ => { }) { ThrowOnDispose = disposalFails };
-            IFeature[] features = RuleFeatures.Create().Append(new TestFeature(_ => finalSystem)).ToArray();
-            var simulation = new Simulation(CreateLevel(), new LevelPopulator(), 60f, features);
+            var simulation = new Simulation(CreateLevel(), new LevelPopulator(), 60f,
+                world => new SystemPipeline(new SimulationPipelineFactory().CreateSystems(world).Append(finalSystem)));
             simulation.Send(MoveCommand.Left);
             simulation.Tick(0f);
             var history = simulation.World.Single(entity => entity.Has<LevelStateTag>()).Get<MoveHistory>();
@@ -268,17 +315,7 @@ namespace Sokoban.Tests.App
         }
 
         private static Simulation CreateSimulation(LevelDefinition level) =>
-            new Simulation(level, new LevelPopulator(), 60f);
-
-        private sealed class TestFeature : IFeature
-        {
-            private readonly Func<World, ISystem<float>> _create;
-            public TestFeature(Func<World, ISystem<float>> create)
-            {
-                _create = create;
-            }
-            public ISystem<float> Create(World world) => _create(world);
-        }
+            new Simulation(level, new LevelPopulator(), 60f, new SimulationPipelineFactory());
 
         private static LevelDefinition CreateLevel()
         {
@@ -297,11 +334,13 @@ namespace Sokoban.Tests.App
             public bool IsEnabled { get; set; } = true;
             public int DisposeCalls { get; private set; }
             public bool ThrowOnDispose { get; set; }
+            public Action OnDispose { get; set; }
             public TestSystem(Action<float> update) => _update = update;
             public void Update(float state) => _update(state);
             public void Dispose()
             {
                 DisposeCalls++;
+                OnDispose?.Invoke();
                 if (ThrowOnDispose) throw new InvalidOperationException("Test disposal failure");
             }
         }

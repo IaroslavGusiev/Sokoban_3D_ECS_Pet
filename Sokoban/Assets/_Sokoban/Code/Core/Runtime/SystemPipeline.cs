@@ -1,6 +1,4 @@
 using System;
-using DefaultEcs;
-using System.Linq;
 using DefaultEcs.System;
 using System.Collections.Generic;
 
@@ -10,15 +8,16 @@ namespace Sokoban.Core
     {
         private readonly SequentialSystem<float> _systems;
 
-        public SystemPipeline(World world, IReadOnlyList<IFeature> features)
+        public SystemPipeline(IEnumerable<ISystem<float>> source)
         {
             var systems = new List<ISystem<float>>();
             
             try
             {
-                systems
-                    .AddRange(features
-                    .Select(feature => feature.Create(world)));
+                foreach (ISystem<float> system in source)
+                {
+                    systems.Add(system);
+                }
 
                 _systems = new SequentialSystem<float>(systems);
             }

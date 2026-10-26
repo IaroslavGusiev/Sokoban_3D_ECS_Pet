@@ -45,6 +45,14 @@ namespace Sokoban.Presentation
                 .AsSingle();
 
             Container
+                .Bind<SimulationPipelineFactory>()
+                .AsSingle();
+
+            Container
+                .Bind<ViewPipelineFactory>()
+                .AsSingle();
+
+            Container
                 .Bind(typeof(ViewAssets), typeof(IViewProvider))
                 .To<ViewAssets>()
                 .AsSingle();
