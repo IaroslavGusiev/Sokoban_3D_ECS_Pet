@@ -1,5 +1,4 @@
 using DefaultEcs;
-using UnityEngine;
 using DefaultEcs.System;
 using Sokoban.Core.Components;
 using Sokoban.Presentation.Ecs.Components;
@@ -11,18 +10,13 @@ namespace Sokoban.Presentation.Ecs.Systems
         public ActorStateInitSystem(World world)
             : base(ActorQuery
                 .Actors(world)
-                .Without<ActorViewState>()
+                .Without<ObservedPosition>()
                 .AsSet(), 
                 useBuffer: true) { }
 
         protected override void Update(float deltaTime, in Entity entity)
         {
-            entity.Set(new ActorViewState
-            {
-                Position = entity.Get<GridPosition>(), 
-                Facing = Quaternion.identity, 
-                HasFacing = false
-            });
+            entity.Set(new ObservedPosition(entity.Get<GridPosition>()));
         }
     }
 }

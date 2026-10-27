@@ -315,6 +315,105 @@ namespace Sokoban.Tests.PlayMode
             Assert.That(simulation.IsCompleted, Is.False);
         });
 
+        [UnityTest]
+        public IEnumerator BindingAndProjection_PreserveAuthoredRotationUntilPlayerFacingExists() => UniTask.ToCoroutine(async () =>
+        {
+            GameObject normal = CreateSkinPrefab("Authored default");
+            GameObject alternate = CreateSkinPrefab("Authored alternate");
+            normal.transform.rotation = Quaternion.Euler(0, 37, 0);
+            alternate.transform.rotation = Quaternion.Euler(0, 63, 0);
+            var provider = new FakeViewProvider(key => key.Skin == SkinId.Default ? normal : alternate);
+            var fixture = CreateLayer(provider, false);
+            Entity player = fixture.Entities[0];
+            World world = player.World;
+            Entity box = world.CreateEntity();
+            box.Set<BoxTag>();
+            box.Set(new GridPosition(5, 3));
+            Entity floor = world.CreateEntity();
+            floor.Set<FloorTag>();
+            floor.Set(new GridPosition(4, 3));
+            var bindings = 0;
+            using var placement = world.SubscribeComponentAdded<TransformComponent>((in Entity entity, in TransformComponent component) =>
+            {
+                bindings++;
+                Assert.That(Quaternion.Angle(component.Transform.rotation, provider.KeyAt(bindings - 1).Skin == SkinId.Default
+                    ? normal.transform.rotation : alternate.transform.rotation), Is.LessThan(0.001f));
+            });
+
+            fixture.Layer.Tick(0f);
+            Assert.That(bindings, Is.EqualTo(3));
+            Assert.That(player.Has<ActorFacing>(), Is.False);
+            Assert.That(box.Has<ActorFacing>(), Is.False);
+            Assert.That(floor.Has<ObservedPosition>(), Is.False);
+            Assert.That(floor.Has<ActorFacing>(), Is.False);
+            Assert.That(floor.Has<ViewMove>(), Is.False);
+            Assert.That(Quaternion.Angle(player.Get<TransformComponent>().Transform.rotation, normal.transform.rotation), Is.LessThan(0.001f));
+
+            box.Set(new GridPosition(6, 3));
+            fixture.Layer.SetPlayerSkin(SkinId.Alternate);
+            fixture.Layer.Tick(0.04f);
+            Assert.That(bindings, Is.EqualTo(4));
+            Assert.That(player.Has<ActorFacing>(), Is.False);
+            Assert.That(box.Has<ActorFacing>(), Is.False);
+            Assert.That(box.Has<ViewMove>(), Is.True);
+            Assert.That(Quaternion.Angle(box.Get<TransformComponent>().Transform.rotation, normal.transform.rotation), Is.LessThan(0.001f));
+            Assert.That(Quaternion.Angle(player.Get<TransformComponent>().Transform.rotation, alternate.transform.rotation), Is.LessThan(0.001f));
+            await UniTask.NextFrame();
+        });
+
+        [UnityTest]
+        public IEnumerator SkinReplacement_PreservesFacingAndMotionThroughImmediateAndDelayedBinding() => UniTask.ToCoroutine(async () =>
+        {
+            GameObject normal = CreateSkinPrefab("Moving default");
+            GameObject alternate = CreateSkinPrefab("Moving alternate");
+            alternate.transform.rotation = Quaternion.Euler(0, 17, 0);
+            var provider = new FakeViewProvider(key => key.Skin == SkinId.Default ? normal : alternate);
+            var fixture = CreateLayer(provider, false);
+            Entity player = fixture.Entities[0];
+            fixture.Layer.Tick(0f);
+            player.Set(new GridPosition(3, 3));
+            fixture.Layer.Tick(0.04f);
+            Quaternion facing = player.Get<ActorFacing>().Value;
+            ViewMove first = player.Get<ViewMove>();
+            Vector3 boundPosition = default;
+            Quaternion boundRotation = default;
+            using var placement = player.World.SubscribeComponentAdded<TransformComponent>((in Entity entity, in TransformComponent component) =>
+            {
+                boundPosition = component.Transform.position;
+                boundRotation = component.Transform.rotation;
+            });
+
+            fixture.Layer.SetPlayerSkin(SkinId.Alternate);
+            fixture.Layer.Tick(0f);
+            Assert.That(boundPosition, Is.EqualTo(first.Position));
+            Assert.That(Quaternion.Angle(boundRotation, facing), Is.LessThan(0.001f));
+            Assert.That(player.Get<ViewMove>().Elapsed, Is.EqualTo(first.Elapsed));
+            Assert.That(player.Get<ViewMove>().From, Is.EqualTo(first.From));
+
+            provider.Hold = true;
+            fixture.Layer.SetPlayerSkin(SkinId.Punk);
+            fixture.Layer.Tick(0.04f);
+            Assert.That(player.Has<ViewPending>(), Is.True);
+            Assert.That(player.Has<TransformComponent>(), Is.False);
+            Assert.That(player.Get<ViewMove>().Elapsed, Is.EqualTo(0.08f).Within(0.0001f));
+            Vector3 beforeBinding = player.Get<ViewMove>().Position;
+            provider.Complete(provider.Calls - 1);
+            await UniTask.NextFrame();
+            fixture.Layer.Tick(0.04f);
+
+            Assert.That(boundPosition, Is.EqualTo(beforeBinding));
+            Assert.That(Quaternion.Angle(boundRotation, facing), Is.LessThan(0.001f));
+            Assert.That(player.Get<ActorFacing>().Value, Is.EqualTo(facing));
+            Assert.That(player.Get<ObservedPosition>().Value, Is.EqualTo(new GridPosition(3, 3)));
+            Assert.That(player.Get<ViewMove>().From, Is.EqualTo(first.From));
+            Assert.That(player.Get<ViewMove>().To, Is.EqualTo(first.To));
+            Assert.That(player.Get<ViewMove>().Elapsed, Is.EqualTo(0.12f).Within(0.0001f));
+            Assert.That(player.Get<TransformComponent>().Transform.position, Is.EqualTo(player.Get<ViewMove>().Position));
+            Assert.That(Quaternion.Angle(player.Get<TransformComponent>().Transform.rotation, facing), Is.LessThan(0.001f));
+            Assert.That(provider.Calls, Is.EqualTo(3));
+            Assert.That(fixture.Layer.Status, Is.EqualTo(ViewStatus.Ready));
+        });
+
         private GameObject CreateSkinPrefab(string name)
         {
             GameObject prefab = CreateObject(name);

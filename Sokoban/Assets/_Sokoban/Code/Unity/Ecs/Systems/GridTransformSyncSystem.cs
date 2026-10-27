@@ -34,13 +34,13 @@ namespace Sokoban.Presentation.Ecs.Systems
                 transform.position = target;
             }
 
-            if (entity.Has<PlayerTag>() && entity.Has<ActorViewState>())
+            if (entity.Has<PlayerTag>() && entity.Has<ActorFacing>())
             {
-                var state = entity.Get<ActorViewState>();
+                var facing = entity.Get<ActorFacing>().Value;
                 
-                if (state.HasFacing && transform.rotation != state.Facing)
+                if (transform.rotation != facing)
                 {
-                    transform.rotation = state.Facing;
+                    transform.rotation = facing;
                 }
             }
         }

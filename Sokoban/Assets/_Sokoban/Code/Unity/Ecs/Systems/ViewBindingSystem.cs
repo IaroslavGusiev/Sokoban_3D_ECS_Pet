@@ -161,9 +161,8 @@ namespace Sokoban.Presentation.Ecs.Systems
                     : GridCoordinates.ToWorld(position);
 
                 Quaternion rotation = entity.Has<PlayerTag>()
-                                      && entity.Has<ActorViewState>()
-                                      && entity.Get<ActorViewState>().HasFacing
-                    ? entity.Get<ActorViewState>().Facing
+                                      && entity.Has<ActorFacing>()
+                    ? entity.Get<ActorFacing>().Value
                     : prefab.transform.rotation;
 
                 view = Object.Instantiate(prefab, viewPosition, rotation, _context.Root);

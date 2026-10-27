@@ -16,9 +16,9 @@ namespace Sokoban.Tests.Editor
             using var world = new World();
             Entity player = Player(world, new GridPosition(2, 3));
             using var system = new ActorMotionSystem(world, 0.4f);
-            Assert.That(player.Has<ActorViewState>(), Is.False);
+            Assert.That(player.Has<ObservedPosition>(), Is.False);
             system.Update(0f);
-            Assert.That(player.Get<ActorViewState>().HasFacing, Is.False);
+            Assert.That(player.Has<ActorFacing>(), Is.False);
             player.Set(new GridPosition(3, 3));
             system.Update(0f);
             ViewMove move = player.Get<ViewMove>();
@@ -26,9 +26,8 @@ namespace Sokoban.Tests.Editor
             Assert.That(move.To, Is.EqualTo(GridCoordinates.ToWorld(new GridPosition(3, 3))));
             Assert.That(move.Duration, Is.EqualTo(0.4f));
             Assert.That(move.IsPushing, Is.False);
-            ActorViewState state = player.Get<ActorViewState>();
-            Assert.That(state.HasFacing, Is.True);
-            Assert.That(Quaternion.Angle(state.Facing, Quaternion.LookRotation(Vector3.right)), Is.LessThan(0.001f));
+            Assert.That(player.Has<ActorFacing>(), Is.True);
+            Assert.That(Quaternion.Angle(player.Get<ActorFacing>().Value, Quaternion.LookRotation(Vector3.right)), Is.LessThan(0.001f));
         }
 
         [Test]
@@ -78,6 +77,7 @@ namespace Sokoban.Tests.Editor
             system.Update(0f);
             Assert.That(player.Get<ViewMove>().IsPushing, Is.True);
             Assert.That(box.Get<ViewMove>().IsPushing, Is.False);
+            Assert.That(box.Has<ActorFacing>(), Is.False);
         }
 
         [Test]
@@ -90,8 +90,8 @@ namespace Sokoban.Tests.Editor
             Assert.DoesNotThrow(() => system.Update(0f));
             foreach (Entity actor in world)
             {
-                Assert.That(actor.Get<ActorViewState>().Position, Is.EqualTo(actor.Get<GridPosition>()));
-                Assert.That(actor.Get<ActorViewState>().HasFacing, Is.False);
+                Assert.That(actor.Get<ObservedPosition>().Value, Is.EqualTo(actor.Get<GridPosition>()));
+                Assert.That(actor.Has<ActorFacing>(), Is.False);
                 Assert.That(actor.Has<ViewMove>(), Is.False);
             }
         }
@@ -107,7 +107,8 @@ namespace Sokoban.Tests.Editor
             system.Update(0f);
             floor.Set(new GridPosition(1, 0));
             system.Update(0.1f);
-            Assert.That(floor.Has<ActorViewState>(), Is.False);
+            Assert.That(floor.Has<ObservedPosition>(), Is.False);
+            Assert.That(floor.Has<ActorFacing>(), Is.False);
             Assert.That(floor.Has<ViewMove>(), Is.False);
         }
 
@@ -124,7 +125,7 @@ namespace Sokoban.Tests.Editor
                 target.transform.rotation = Quaternion.Euler(0, 37, 0);
                 Quaternion original = target.transform.rotation;
                 Quaternion facing = Quaternion.LookRotation(Vector3.left);
-                player.Set(new ActorViewState { Position = player.Get<GridPosition>(), Facing = facing, HasFacing = false });
+                player.Set(new ObservedPosition(player.Get<GridPosition>()));
                 Vector3 expected = GridCoordinates.ToWorld(player.Get<GridPosition>());
                 if (interpolating)
                 {
@@ -135,9 +136,7 @@ namespace Sokoban.Tests.Editor
                 system.Update(0f);
                 Assert.That(target.transform.position, Is.EqualTo(expected));
                 Assert.That(target.transform.rotation, Is.EqualTo(original));
-                ActorViewState state = player.Get<ActorViewState>();
-                state.HasFacing = true;
-                player.Set(state);
+                player.Set(new ActorFacing(facing));
                 system.Update(0f);
                 Assert.That(Quaternion.Angle(target.transform.rotation, facing), Is.LessThan(0.001f));
                 target.transform.hasChanged = false;
@@ -200,6 +199,7 @@ namespace Sokoban.Tests.Editor
             system.Update(0f);
             Assert.That(player.Get<ViewMove>().IsPushing, Is.False);
             Assert.That(box.Get<ViewMove>().IsPushing, Is.False);
+            Assert.That(box.Has<ActorFacing>(), Is.False);
         }
 
         [TestCase(0f, 0f, 2f, false)]
@@ -235,7 +235,7 @@ namespace Sokoban.Tests.Editor
             foreach (Entity entity in world)
             {
                 Assert.That(entity.Has<ViewMove>(), Is.False);
-                Assert.That(entity.Get<ActorViewState>().Position, Is.EqualTo(entity.Get<GridPosition>()));
+                Assert.That(entity.Get<ObservedPosition>().Value, Is.EqualTo(entity.Get<GridPosition>()));
             }
         }
 
@@ -250,7 +250,7 @@ namespace Sokoban.Tests.Editor
             player.Set(new GridPosition(1, 0));
             system.Update(0f);
             Assert.That(player.Has<ViewMove>(), Is.False);
-            Assert.That(player.Get<ActorViewState>().Position, Is.EqualTo(new GridPosition(1, 0)));
+            Assert.That(player.Get<ObservedPosition>().Value, Is.EqualTo(new GridPosition(1, 0)));
         }
 
         [Test]
@@ -286,8 +286,8 @@ namespace Sokoban.Tests.Editor
                 motion.Update(0.1f);
                 projection.Update(0.1f);
                 Assert.That(player.Has<ViewMove>(), Is.False);
-                Assert.That(player.Get<ActorViewState>().Position, Is.EqualTo(new GridPosition(2, 3)));
-                Assert.That(player.Get<ActorViewState>().HasFacing, Is.False);
+                Assert.That(player.Get<ObservedPosition>().Value, Is.EqualTo(new GridPosition(2, 3)));
+                Assert.That(player.Has<ActorFacing>(), Is.False);
                 Assert.That(target.transform.rotation, Is.EqualTo(rotation));
                 Assert.That(target.transform.position, Is.EqualTo(new Vector3(2, 0, 3)));
             }
@@ -313,14 +313,14 @@ namespace Sokoban.Tests.Editor
             Entity late = Player(world, new GridPosition(3, 2));
             system.Update(0.2f);
             Assert.That(system.IsEnabled, Is.False);
-            Assert.That(late.Has<ActorViewState>(), Is.False);
-            Assert.That(player.Get<ActorViewState>().Position, Is.EqualTo(new GridPosition(1, 0)));
+            Assert.That(late.Has<ObservedPosition>(), Is.False);
+            Assert.That(player.Get<ObservedPosition>().Value, Is.EqualTo(new GridPosition(1, 0)));
             Assert.That(player.Get<ViewMove>().Elapsed, Is.EqualTo(0.1f));
             system.IsEnabled = true;
             system.Update(0.1f);
-            Assert.That(late.Get<ActorViewState>().Position, Is.EqualTo(late.Get<GridPosition>()));
+            Assert.That(late.Get<ObservedPosition>().Value, Is.EqualTo(late.Get<GridPosition>()));
             Assert.That(late.Has<ViewMove>(), Is.False);
-            Assert.That(player.Get<ActorViewState>().Position, Is.EqualTo(new GridPosition(1, 1)));
+            Assert.That(player.Get<ObservedPosition>().Value, Is.EqualTo(new GridPosition(1, 1)));
             Assert.That(player.Get<ViewMove>().From, Is.EqualTo(previous));
             Assert.That(player.Get<ViewMove>().Elapsed, Is.EqualTo(0.1f));
         }
@@ -340,9 +340,69 @@ namespace Sokoban.Tests.Editor
             Entity late = Player(world, new GridPosition(3, 2));
             using var replacement = new ActorMotionSystem(world, 0.4f);
             replacement.Update(0.1f);
-            Assert.That(late.Get<ActorViewState>().Position, Is.EqualTo(late.Get<GridPosition>()));
+            Assert.That(late.Get<ObservedPosition>().Value, Is.EqualTo(late.Get<GridPosition>()));
             Assert.That(late.Has<ViewMove>(), Is.False);
             Assert.That(player.Get<ViewMove>().Elapsed, Is.EqualTo(0.2f));
+        }
+
+        [Test]
+        public void NewlyCreatedBox_InitializesWithoutMotionAndNeverReceivesFacing()
+        {
+            using var world = new World();
+            Entity player = Player(world, new GridPosition(0, 0));
+            using var system = new ActorMotionSystem(world, 0.4f);
+            system.Update(0f);
+
+            Entity box = world.CreateEntity();
+            box.Set<BoxTag>();
+            box.Set(new GridPosition(2, 3));
+            system.Update(0.1f);
+
+            Assert.That(box.Get<ObservedPosition>().Value, Is.EqualTo(new GridPosition(2, 3)));
+            Assert.That(box.Has<ViewMove>(), Is.False);
+            Assert.That(box.Has<ActorFacing>(), Is.False);
+            Assert.That(player.Has<ActorFacing>(), Is.False);
+
+            box.Set(new GridPosition(3, 3));
+            system.Update(0.1f);
+
+            Assert.That(box.Get<ObservedPosition>().Value, Is.EqualTo(new GridPosition(3, 3)));
+            Assert.That(box.Get<ViewMove>().Elapsed, Is.EqualTo(0.1f));
+            Assert.That(box.Has<ActorFacing>(), Is.False);
+            Assert.That(player.Has<ActorFacing>(), Is.False);
+        }
+
+        [Test]
+        public void Detection_ReplacesObservedPositionAndFacingThroughSet()
+        {
+            using var world = new World();
+            Entity player = Player(world, new GridPosition(0, 0));
+            using var system = new ActorMotionSystem(world, 0.4f);
+            system.Update(0f);
+            var observedChanges = 0;
+            var facingChanges = 0;
+            using var observed = world.SubscribeComponentChanged<ObservedPosition>(
+                (in Entity entity, in ObservedPosition previous, in ObservedPosition current) => observedChanges++);
+            using var facing = world.SubscribeComponentChanged<ActorFacing>(
+                (in Entity entity, in ActorFacing previous, in ActorFacing current) => facingChanges++);
+
+            player.Set(new GridPosition(1, 0));
+            system.Update(0f);
+            ObservedPosition firstPosition = player.Get<ObservedPosition>();
+            ActorFacing firstFacing = player.Get<ActorFacing>();
+            player.Set(new GridPosition(1, 1));
+            system.Update(0f);
+
+            Assert.That(observedChanges, Is.EqualTo(2));
+            Assert.That(facingChanges, Is.EqualTo(1));
+            Assert.That(firstPosition.Value, Is.EqualTo(new GridPosition(1, 0)));
+            Assert.That(Quaternion.Angle(firstFacing.Value, Quaternion.LookRotation(Vector3.right)), Is.LessThan(0.001f));
+            Assert.That(player.Get<ObservedPosition>().Value, Is.EqualTo(new GridPosition(1, 1)));
+            Assert.That(Quaternion.Angle(player.Get<ActorFacing>().Value, Quaternion.LookRotation(Vector3.forward)), Is.LessThan(0.001f));
+
+            system.Update(0f);
+            Assert.That(observedChanges, Is.EqualTo(2));
+            Assert.That(facingChanges, Is.EqualTo(1));
         }
 
         private static Entity Player(World world, GridPosition position)

@@ -14,13 +14,13 @@ namespace Sokoban.Presentation.Ecs.Systems
         private bool _pushing;
 
         public ActorMoveDetectionSystem(World world, float duration)
-            : base(ActorQuery.Actors(world).With<ActorViewState>().AsSet(), useBuffer: true)
+            : base(ActorQuery.Actors(world).With<ObservedPosition>().AsSet(), useBuffer: true)
         {
             _duration = duration;
             try
             {
-                _players = ActorQuery.Actors(world).With<ActorViewState>().With<PlayerTag>().AsSet();
-                _boxes = ActorQuery.Actors(world).With<ActorViewState>().With<BoxTag>().AsSet();
+                _players = ActorQuery.Actors(world).With<ObservedPosition>().With<PlayerTag>().AsSet();
+                _boxes = ActorQuery.Actors(world).With<ObservedPosition>().With<BoxTag>().AsSet();
             }
             catch
             {
@@ -56,14 +56,14 @@ namespace Sokoban.Presentation.Ecs.Systems
         protected override void Update(float deltaTime, in Entity entity)
         {
             var position = entity.Get<GridPosition>();
-            var state = entity.Get<ActorViewState>();
+            var observed = entity.Get<ObservedPosition>().Value;
             
-            if (position == state.Position)
+            if (position == observed)
             {
                 return;
             }
 
-            Vector3 previous = GridCoordinates.ToWorld(state.Position);
+            Vector3 previous = GridCoordinates.ToWorld(observed);
             
             Vector3 from = entity.Has<ViewMove>() 
                 ? entity.Get<ViewMove>().Position 
@@ -73,18 +73,19 @@ namespace Sokoban.Presentation.Ecs.Systems
             
             entity.Set(new ViewMove(from, to, _duration, entity.Has<PlayerTag>() && _pushing));
             
-            state.Facing = Quaternion.LookRotation(to - previous);
-            state.HasFacing = true;
-            state.Position = position;
+            if (entity.Has<PlayerTag>())
+            {
+                entity.Set(new ActorFacing(Quaternion.LookRotation(to - previous)));
+            }
             
-            entity.Set(state);
+            entity.Set(new ObservedPosition(position));
         }
 
         private bool IsSuccessfulPush()
         {
             foreach (Entity player in _players.GetEntities())
             {
-                GridPosition from = player.Get<ActorViewState>().Position;
+                GridPosition from = player.Get<ObservedPosition>().Value;
                 var to = player.Get<GridPosition>();
                 
                 if (from == to)
@@ -97,7 +98,7 @@ namespace Sokoban.Presentation.Ecs.Systems
                 
                 foreach (Entity box in _boxes.GetEntities())
                 {
-                    if (box.Get<ActorViewState>().Position != to)
+                    if (box.Get<ObservedPosition>().Value != to)
                     {
                         continue;
                     }
