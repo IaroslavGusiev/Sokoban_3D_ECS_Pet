@@ -66,9 +66,11 @@ namespace Sokoban.Tests.PlayMode
             Assert.That(provider.Calls, Is.EqualTo(fixture.Entities.Length));
             for (int index = 0; index < provider.Calls - 1; index++) provider.Complete(index);
             await UniTask.Yield();
+            fixture.Layer.Tick(0f);
             Assert.That(fixture.Layer.Status, Is.EqualTo(ViewStatus.Binding));
             provider.Complete(provider.Calls - 1);
             await UniTask.Yield();
+            fixture.Layer.Tick(0f);
             Assert.That(fixture.Layer.Status, Is.EqualTo(ViewStatus.Ready));
             Assert.That(fixture.Root.childCount, Is.EqualTo(fixture.Entities.Length));
         });
@@ -206,6 +208,7 @@ namespace Sokoban.Tests.PlayMode
             Assert.That(player.Has<ViewPending>(), Is.True);
             provider.Complete(0);
             await UniTask.NextFrame();
+            fixture.Layer.Tick(0f);
             Assert.That(fixture.Root.childCount, Is.Zero);
             Assert.That(player.Has<TransformComponent>(), Is.False);
             Assert.That(player.Has<ViewPending>(), Is.False);
@@ -229,6 +232,7 @@ namespace Sokoban.Tests.PlayMode
             fixture.Layer.Tick(0f);
             provider.Fail(0);
             await UniTask.NextFrame();
+            fixture.Layer.Tick(0f);
             Assert.That(player.Has<ViewFailed>(), Is.False);
             Assert.That(player.Has<ViewPending>(), Is.False);
             provider.Hold = false;
@@ -249,6 +253,7 @@ namespace Sokoban.Tests.PlayMode
             fixture.Layer.Tick(0f);
             provider.Fail(0);
             await UniTask.NextFrame();
+            fixture.Layer.Tick(0f);
             Assert.That(player.Has<ViewFailed>(), Is.True);
             Assert.That(player.Has<ViewPending>(), Is.False);
             Assert.That(player.Has<TransformComponent>(), Is.False);

@@ -6,6 +6,7 @@ namespace Sokoban.Presentation
         Wall,
         Box,
         Player,
-        Goal
+        Goal,
+        HintArrow
     }
 }

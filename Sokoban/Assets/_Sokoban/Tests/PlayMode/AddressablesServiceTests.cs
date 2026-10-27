@@ -6,6 +6,7 @@ using Cysharp.Threading.Tasks;
 using NUnit.Framework;
 using Sokoban.Core;
 using Sokoban.Presentation;
+using Sokoban.Presentation.Ecs.Model;
 using UnityEngine;
 using UnityEngine.AddressableAssets;
 using UnityEngine.ResourceManagement.AsyncOperations;
@@ -132,6 +133,22 @@ namespace Sokoban.Tests.PlayMode
                 Assert.That(loaded, Has.Exactly(1).InstanceOf<ViewCatalog>());
             }
             finally { _service.Release(configs); }
+        });
+
+        [UnityTest]
+        public IEnumerator ArrowLoadsThroughViewAssetsFromBuiltContent() => UniTask.ToCoroutine(async () =>
+        {
+            using var data = new StaticDataProvider(_service);
+            await data.LoadAsync(CancellationToken.None);
+            using var views = new ViewAssets(data, _service);
+            var key = new ViewKey(ViewKind.HintArrow, SkinId.Default);
+            Assert.That(data.GetViewCatalog().Resolve(key).Address, Is.EqualTo("views/hint_arrow"));
+            GameObject arrow = await views.LoadAsync(key, CancellationToken.None);
+            Assert.That(await views.LoadAsync(key, CancellationToken.None), Is.SameAs(arrow));
+            Assert.That(arrow.GetComponent<HintArrow>(), Is.Not.Null);
+            Assert.That(arrow.GetComponentsInChildren<Collider>(true), Is.Empty);
+            Assert.That(arrow.GetComponentsInChildren<EntityView>(true), Is.Empty);
+            Assert.That(arrow.GetComponentsInChildren<MeshRenderer>(true).Length, Is.EqualTo(2));
         });
 
         [UnityTest]

@@ -2,8 +2,8 @@ using System;
 using Zenject;
 using UnityEngine;
 using Sokoban.Core;
-using Sokoban.Core.Commands;
 using System.Threading;
+using Sokoban.Core.Commands;
 using Cysharp.Threading.Tasks;
 using System.Collections.Generic;
 
@@ -17,7 +17,7 @@ namespace Sokoban.Presentation
         private readonly ILevelSource _source;
         private readonly LevelRunFactory _runFactory;
         private readonly IStaticDataProvider _staticData;
-        private readonly IHintService _hintService;
+        private readonly HintCoordinator _hints;
         private readonly List<LevelResult> _results = new();
         private readonly CancellationTokenSource _cancellation = new();
 
@@ -26,15 +26,11 @@ namespace Sokoban.Presentation
 
         private int _levelIndex;
         private SkinId _playerSkin;
+        private bool _undoRequested;
         private float _completionTimer;
         private bool _restartRequested;
         private bool _nextSkinRequested;
-        private bool _undoRequested;
-        private bool _hintRequested;
-        private HintCalculation _hintCalculation;
-        private LevelRun _hintRun;
-        private long _hintRevision;
-        
+
         public int LevelCount { get; private set; }
         public GameplayPhase Phase { get; private set; }
         public IReadOnlyList<LevelResult> Results { get; }
@@ -51,24 +47,22 @@ namespace Sokoban.Presentation
 
         public bool CanUndo => Phase == GameplayPhase.Playing && _run != null && _run.CanUndo;
 
-        public bool CanHint => Phase == GameplayPhase.Playing && _run != null && _run.CanHint
-            && _hintCalculation == null && _hintRequested == false;
-        public HintStatus HintStatus { get; private set; }
-        public MoveCommand HintMove { get; private set; }
-
-        [Inject]
+        public bool CanHint => _hints.CanRequest(_run, Phase);
+        public HintStatus HintStatus => _hints.Status;
+        public MoveCommand HintMove => _hints.Move;
+        
         internal GameplayController(
             IPlayerInput input,
             ILevelSource source,
+            HintCoordinator hints,
             LevelRunFactory runFactory,
-            IStaticDataProvider staticData,
-            IHintService hintService)
+            IStaticDataProvider staticData)
         {
             _input = input;
+            _hints = hints;
             _source = source;
             _runFactory = runFactory;
             _staticData = staticData;
-            _hintService = hintService;
             Results = _results.AsReadOnly();
         }
 
@@ -81,8 +75,11 @@ namespace Sokoban.Presentation
         public void Dispose()
         {
             TransitionTo(GameplayPhase.Loading);
+            
             _cancellation.Cancel();
             _cancellation.Dispose();
+            _hints.Dispose();
+            
             ReleaseRun();
         }
 
@@ -109,41 +106,44 @@ namespace Sokoban.Presentation
                 _undoRequested = true;
             }
         }
+        
+        public void RequestHint() => 
+            _hints.Request(_run, Phase);
 
-        public void RequestHint()
-        {
-            if (CanHint) _hintRequested = true;
-        }
-
-        public void Tick() => Tick(Time.deltaTime);
+        public void Tick() => 
+            Tick(Time.deltaTime);
 
         internal void Tick(float deltaTime)
         {
             bool restartRequested = _restartRequested;
             bool nextSkinRequested = _nextSkinRequested;
             bool undoRequested = _undoRequested;
-            bool hintRequested = _hintRequested;
+            bool hintRequested = _hints.ConsumeRequest();
+            
             _restartRequested = false;
             _nextSkinRequested = false;
             _undoRequested = false;
-            _hintRequested = false;
 
             if (Phase == GameplayPhase.Loading)
             {
                 return;
             }
 
-            undoRequested = (undoRequested || _input.UndoPressed) && CanUndo
-                && restartRequested == false && _input.RestartPressed == false && _input.NextLevelPressed == false;
+            undoRequested = (undoRequested || _input.UndoPressed) && CanUndo && restartRequested == false && _input.RestartPressed == false && _input.NextLevelPressed == false;
+            
             if (hintRequested && CanHint && restartRequested == false && _input.RestartPressed == false && _input.NextLevelPressed == false)
-                StartHint();
+            {
+                _hints.Start(_run, Phase);
+            }
+            
             HandleSkinInput(nextSkinRequested);
             
             if (TickState(deltaTime, undoRequested) == TickResult.ProcessCommands && Phase != GameplayPhase.Loading)
             {
                 HandleCommands(restartRequested);
             }
-            UpdateHint();
+            
+            _hints.Update(_run, Phase);
         }
 
         private void HandleSkinInput(bool requested)
@@ -158,7 +158,11 @@ namespace Sokoban.Presentation
         private void TransitionTo(GameplayPhase next)
         {
             Phase = next;
-            if (next != GameplayPhase.Playing) InvalidateHint();
+            
+            if (next != GameplayPhase.Playing)
+            {
+                _hints.Invalidate();
+            }
 
             if (next == GameplayPhase.Completed)
             {
@@ -215,6 +219,7 @@ namespace Sokoban.Presentation
             {
                 _run.Send(_input.ReadMove());
             }
+            
             _run.Tick(deltaTime);
             
             if (_run.IsTimedOut)
@@ -355,7 +360,8 @@ namespace Sokoban.Presentation
 
         private void ReleaseRun()
         {
-            InvalidateHint();
+            _hints.Invalidate();
+            
             try
             {
                 _run?.Dispose();
@@ -369,76 +375,5 @@ namespace Sokoban.Presentation
         private void TickLevelFailed(float deltaTime) => 
             _run?.TickView(deltaTime);
 
-        private void StartHint()
-        {
-            InvalidateHint();
-            _hintRun = _run;
-            _hintRevision = _run.BoardRevision;
-            _hintCalculation = new HintCalculation(_hintService, _run.CaptureHintBoard());
-            HintStatus = HintStatus.Calculating;
-        }
-
-        private bool IsHintCurrent() =>
-            Phase == GameplayPhase.Playing && ReferenceEquals(_hintRun, _run) && _run != null
-            && _run.CanHint && _run.BoardRevision == _hintRevision;
-
-        private void UpdateHint()
-        {
-            if (_hintRun == null) return;
-            if (IsHintCurrent() == false)
-            {
-                InvalidateHint();
-                return;
-            }
-            HintCalculation request = _hintCalculation;
-            if (request == null || request.Task.IsCompleted == false) return;
-            HintCalculation.Completion completion = request.Task.GetAwaiter().GetResult();
-            if (ReferenceEquals(request, _hintCalculation) == false || IsHintCurrent() == false) return;
-            _hintCalculation = null;
-            if (completion.IsCanceled)
-            {
-                InvalidateHint();
-                return;
-            }
-            if (completion.Error != null)
-            {
-                HintStatus = HintStatus.Failed;
-                Debug.LogException(completion.Error);
-                return;
-            }
-            HintStatus = completion.Result.Outcome switch
-            {
-                HintOutcome.Found => HintStatus.Available,
-                HintOutcome.NoSolution => HintStatus.NoSolution,
-                HintOutcome.BudgetExhausted => HintStatus.BudgetExhausted,
-                HintOutcome.AlreadySolved => HintStatus.AlreadySolved,
-                _ => HintStatus.Failed
-            };
-            if (HintStatus == HintStatus.Available)
-            {
-                try
-                {
-                    _run.ShowHint(completion.Result.Move);
-                    HintMove = completion.Result.Move;
-                }
-                catch (Exception exception)
-                {
-                    HintStatus = HintStatus.Failed;
-                    _run.HideHint();
-                    Debug.LogException(exception);
-                }
-            }
-        }
-
-        private void InvalidateHint()
-        {
-            _hintRequested = false;
-            _hintCalculation?.Cancel();
-            _hintCalculation = null;
-            _hintRun = null;
-            HintStatus = HintStatus.None;
-            HintMove = default;
-            _run?.HideHint();
-        }
     }
 }

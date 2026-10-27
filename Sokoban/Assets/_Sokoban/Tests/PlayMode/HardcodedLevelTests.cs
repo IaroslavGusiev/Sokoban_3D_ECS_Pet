@@ -72,6 +72,8 @@ namespace Sokoban.Tests.PlayMode
             Assert.That(disposables.OfType<GameplayController>(), Is.Empty);
             Assert.That(disposables.OfType<ViewAssets>(), Is.Empty);
             Assert.That(disposables.OfType<StaticDataProvider>(), Is.Empty);
+            Assert.That(disposables.OfType<HintCoordinator>(), Is.Empty);
+            Assert.That(context.Container.HasBinding<HintArrow>(), Is.False);
             _levelRoot = context.Container.Resolve<LevelRoot>().Transform;
             float deadline = Time.realtimeSinceStartup + 10f;
             while (_controller.Phase != GameplayPhase.Playing && Time.realtimeSinceStartup < deadline) yield return null;

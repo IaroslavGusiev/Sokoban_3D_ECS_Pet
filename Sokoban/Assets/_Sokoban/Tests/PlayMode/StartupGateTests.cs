@@ -53,6 +53,7 @@ namespace Sokoban.Tests.PlayMode
             Assert.That(floor.Has<ViewPending>(), Is.True);
             Assert.That(layer.Status, Is.EqualTo(ViewStatus.Binding));
             provider.Complete(CreateObject("Prefab"));
+            layer.Tick(0f);
             Assert.That(layer.Status, Is.EqualTo(ViewStatus.Ready));
             Assert.That(ignored.Has<TransformComponent>(), Is.False);
             floor.Remove<TransformComponent>();
@@ -75,11 +76,20 @@ namespace Sokoban.Tests.PlayMode
             Assert.That(player.Get<GridPosition>(), Is.EqualTo(new GridPosition(2, 1)));
             Assert.That(player.Has<ViewPending>(), Is.True);
             provider.Complete(CreateObject("Prefab"));
-            Transform view = player.Get<TransformComponent>().Transform;
-            Assert.That(view.position, Is.EqualTo(new Vector3(2, 0, 1)),
-                "Binding must use the latest position before the next projection tick.");
-            view.position = Vector3.one * 50;
+            Vector3 initialPosition = default;
+            using var placement = simulation.World.SubscribeComponentAdded<TransformComponent>(
+                (in Entity entity, in TransformComponent component) =>
+                {
+                    if (entity == player)
+                    {
+                        initialPosition = component.Transform.position;
+                        component.Transform.position = Vector3.one * 50;
+                    }
+                });
             controller.Tick();
+            Transform view = player.Get<TransformComponent>().Transform;
+            Assert.That(initialPosition, Is.EqualTo(new Vector3(2, 0, 1)),
+                "Binding must use the latest position before the next projection tick.");
             Assert.That(view.position, Is.EqualTo(new Vector3(2, 0, 1)));
             Assert.That(StateOf(controller), Is.EqualTo("Playing"));
             Assert.That(input.Reads, Is.Zero);
@@ -398,7 +408,8 @@ namespace Sokoban.Tests.PlayMode
             var factory = new LevelRunFactory(new LevelRoot(CreateObject("Level root").transform), provider, new LevelPopulator(), new SimulationPipelineFactory(), new ViewPipelineFactory());
             staticData ??= new TestStaticData();
             staticData.Gameplay = settings;
-            return new GameplayController(input, source, factory, staticData, new HintService(new HintSolver()));
+            return new GameplayController(input, source, new HintCoordinator(new HintService(new HintSolver()), provider),
+                factory, staticData);
         }
 
         [Test]

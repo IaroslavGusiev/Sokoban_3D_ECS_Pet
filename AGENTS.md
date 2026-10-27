@@ -20,6 +20,21 @@ Read `docs/ARCHITECTURE.md` when planning changes that touch architecture, owner
 - Favor simple designs that demonstrate the learning goal; avoid speculative abstractions, premature optimization, and game features unrelated to the experiment.
 - Design for isolated pure C# tests of movement, pushing, blocking, and victory conditions, plus targeted integration/lifecycle tests for async behavior.
 
+# Code style
+
+Follow [docs/CODING_STYLE.md](docs/CODING_STYLE.md) and preserve the surrounding code style.
+
+- Use braces for all control-flow bodies, including single statements.
+- Prefer `condition == false` to negating boolean expressions.
+- Separate logical steps with blank lines; avoid compressed statements.
+- Split long predicates and fluent chains where it improves readability.
+- Use expression-bodied members for simple forwarding or expressions; use block bodies for orchestration and multi-step logic.
+- Group dependencies, owned references, and scalar state separately.
+- Place public operations before private implementation helpers.
+- Use names that describe the responsibility actually performed.
+- Preserve existing naming and formatting outside the changed scope.
+- Do not introduce wrappers or interfaces without a concrete purpose.
+
 # Working workflow
 
 1. Read relevant code, configuration, docs, and available logs before proposing edits. Trace behavior, distinguish facts from assumptions, and state uncertainties.

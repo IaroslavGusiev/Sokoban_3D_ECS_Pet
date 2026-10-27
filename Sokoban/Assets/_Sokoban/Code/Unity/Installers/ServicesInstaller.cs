@@ -1,15 +1,12 @@
 using Zenject;
-using Sokoban.Core;
 using UnityEngine;
-using UnityEngine.Serialization;
+using Sokoban.Core;
 
 namespace Sokoban.Presentation
 {
     public class ServicesInstaller : MonoInstaller
     {
-        [FormerlySerializedAs("_levelRoot")]
         [SerializeField] private Transform levelRoot;
-        [SerializeField] private HintArrow hintArrowPrefab;
 
         public override void InstallBindings()
         {
@@ -23,9 +20,9 @@ namespace Sokoban.Presentation
                 .AsSingle();
 
             Container
-                .Bind<HintArrow>()
-                .FromInstance(hintArrowPrefab)
+                .Bind<HintCoordinator>()
                 .AsSingle();
+
             Container
                 .Bind<IAddressablesService>()
                 .To<AddressablesService>()

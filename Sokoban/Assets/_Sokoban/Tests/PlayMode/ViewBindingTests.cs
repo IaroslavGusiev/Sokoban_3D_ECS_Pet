@@ -60,6 +60,7 @@ namespace Sokoban.Tests.PlayMode
             player.Set(new GridPosition(5, 6));
             provider.Complete(prefab);
             yield return null;
+            binding.Update(0f);
             Assert.That(player.Has<ViewPending>(), Is.False);
             Assert.That(player.Has<ViewFailed>(), Is.False);
             Transform view = player.Get<TransformComponent>().Transform;
@@ -116,6 +117,7 @@ namespace Sokoban.Tests.PlayMode
             Assert.That(provider.Kind, Is.EqualTo(ViewKind.Goal));
             provider.Complete(prefab);
             yield return null;
+            binding.Update(0f);
             Assert.That(entity.Get<TransformComponent>().Transform, Is.SameAs(root.GetChild(0)));
             Assert.That(entity.Get<TransformComponent>().Transform.position, Is.EqualTo(new Vector3(2, 0, 4)));
             cancellation.Cancel();
@@ -358,7 +360,11 @@ namespace Sokoban.Tests.PlayMode
                     using var binding = new ViewBindingSystem(world, new ViewContext(CreateObject("Root").transform, assets, cancellation.Token, 0.16f));
                     binding.Update(0f);
                     float deadline = Time.realtimeSinceStartup + 5f;
-                    while (entities.Any(entity => entity.Has<ViewPending>()) && Time.realtimeSinceStartup < deadline) yield return null;
+                    while (entities.Any(entity => entity.Has<ViewPending>()) && Time.realtimeSinceStartup < deadline)
+                    {
+                        yield return null;
+                        binding.Update(0f);
+                    }
                     Assert.That(entities.All(entity => !entity.Has<ViewPending>() &&
                         (run == 0 ? entity.Has<ViewFailed>() && !entity.Has<TransformComponent>() :
                         !entity.Has<ViewFailed>() && entity.Has<TransformComponent>())), Is.True);

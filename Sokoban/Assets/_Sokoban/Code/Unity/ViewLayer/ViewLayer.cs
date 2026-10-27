@@ -3,8 +3,8 @@ using DefaultEcs;
 using UnityEngine;
 using Sokoban.Core;
 using System.Threading;
-using Sokoban.Core.Components;
 using Sokoban.Core.Commands;
+using Sokoban.Core.Components;
 using Object = UnityEngine.Object;
 using Sokoban.Presentation.Ecs.Components;
 
@@ -19,8 +19,12 @@ namespace Sokoban.Presentation
         private readonly EntitySet _movingViews;
         private readonly SystemPipeline _pipeline;
         private readonly CancellationTokenSource _cancellation = new();
-        private readonly HintArrow _hintArrowPrefab;
+        
         private HintArrow _hintArrow;
+
+        public bool IsMoving => _movingViews.Count > 0;
+
+        public bool HasHintArrow => _hintArrow != null;
 
         public ViewStatus Status =>
             _failedViews.Count > 0
@@ -29,11 +33,8 @@ namespace Sokoban.Presentation
                     ? ViewStatus.Binding
                     : ViewStatus.Ready;
 
-        public bool IsMoving => _movingViews.Count > 0;
-
-        public ViewLayer(LevelRoot root, World world, IViewProvider provider, ViewPipelineFactory pipelineFactory, RunOptions options, HintArrow hintArrowPrefab = null)
+        public ViewLayer(LevelRoot root, World world, IViewProvider provider, ViewPipelineFactory pipelineFactory, RunOptions options)
         {
-            _hintArrowPrefab = hintArrowPrefab;
             try
             {
                 _root = new GameObject("Level view").transform;
@@ -77,6 +78,9 @@ namespace Sokoban.Presentation
             }
         }
 
+        public void Tick(float deltaTime) => 
+            _pipeline.Tick(deltaTime);
+
         public void SetPlayerSkin(SkinId skin)
         {
             foreach (Entity player in _players.GetEntities())
@@ -109,18 +113,36 @@ namespace Sokoban.Presentation
             }
         }
 
-        public void Tick(float deltaTime) => 
-            _pipeline.Tick(deltaTime);
-
-        public void ShowHint(GridPosition player, MoveCommand move)
+        public void ShowHint(GameObject prefab, GridPosition player, MoveCommand move)
         {
-            if (_hintArrow == null) _hintArrow = Object.Instantiate(_hintArrowPrefab, _root);
+            if (_cancellation.IsCancellationRequested)
+            {
+                throw new ObjectDisposedException(nameof(ViewLayer));
+            }
+            
+            if (_hintArrow == null)
+            {
+                HintArrow arrow = prefab != null 
+                    ? prefab.GetComponent<HintArrow>() 
+                    : null;
+                
+                if (arrow == null)
+                {
+                    throw new InvalidOperationException("The hint arrow view must contain HintArrow.");
+                }
+                
+                _hintArrow = Object.Instantiate(arrow, _root);
+            }
+            
             _hintArrow.Show(player, move);
         }
 
         public void HideHint()
         {
-            if (_hintArrow != null) _hintArrow.gameObject.SetActive(false);
+            if (_hintArrow != null)
+            {
+                _hintArrow.gameObject.SetActive(false);
+            }
         }
 
         private void DestroyRoot()

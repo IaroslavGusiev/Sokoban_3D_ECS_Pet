@@ -1,11 +1,11 @@
 # Setup and content authoring
 
-Current workflow, checked against source and saved configuration on 2026-10-25. Open the Unity project in `Sokoban/`, using the Editor version in `Sokoban/ProjectSettings/ProjectVersion.txt` (currently 6000.0.63f1). Resolve existing dependencies and wait for imports and compilation. Package versions belong to the project manifests and vendored packages; no additional package installation is required by this guide.
+Current workflow, checked against source and saved configuration on 2026-10-26. Open the Unity project in `Sokoban/`, using the Editor version in `Sokoban/ProjectSettings/ProjectVersion.txt` (currently 6000.0.63f1). Resolve existing dependencies and wait for imports and compilation. Package versions belong to the project manifests and vendored packages; no additional package installation is required by this guide.
 
 ## Run the project
 
 1. Open `Assets/_Sokoban/Scenes/GameplayScene.unity`.
-2. On ServicesInstaller, confirm **Level Root** and **Hint Arrow Prefab** are assigned. The saved scene uses `Assets/_Sokoban/Prefabs/HintArrow.prefab` directly. Config assets live in `Assets/Addressables/Config/`: `GameplaySettings.asset`, `LevelList.asset`, and `LevelViewCatalog.asset`. Each is Addressable and carries the **Configs** label. Keep exactly one asset of each type under that label. Scene installers do not reference config assets directly.
+2. On ServicesInstaller, confirm **Level Root** is assigned. The hint arrow is loaded from the ViewCatalog Default `HintArrow` entry at `views/hint_arrow`; no Inspector prefab reference is needed. Config assets live in `Assets/Addressables/Config/`: `GameplaySettings.asset`, `LevelList.asset`, and `LevelViewCatalog.asset`. Each is Addressable and carries the **Configs** label. Keep exactly one asset of each type under that label. Scene installers do not reference config assets directly.
 3. Run **Tools > Sokoban > Validate Addressable Addresses**. Validation throws on invalid data; successful validation returns without an error. It checks current Editor settings, not the freshness of an existing content build.
 4. Open **Window > Asset Management > Addressables > Groups**. For the shipped **Use Existing Build** workflow, save content and build **Build > New Build > Default Build Script** before entering Play Mode. **Use Asset Database (fastest)** is also available for authoring checks without built bundles.
 5. To show the temporary debug status/results, create an active GameObject in the gameplay scene and add GameplayDebugOverlay. Keep it in that SceneContext's scene, outside generated Level view roots. Zenject injects IGameplayStatus and IGameplayCommands; no additional service binding or Inspector reference is required. Save the scene.
@@ -29,7 +29,7 @@ Undo restores affected positions and the previous move count, but never restores
 
 Hints use a copied current board and a background breadth-first search, capped at 100,000 visited states. While the button reads **Calculating…**, movement and the countdown continue. A found result shows **Hint: direction** and a yellow arrow above/near the player; it recommends a move on a discovered solution, with no penalty or automatic input. **No solution found**, **Search budget exhausted**, and **Calculation failed** are separate outcomes. A large board can exceed this first version's budget. The solver supports the rectangular, enclosed boards loaded by this application; it does not promise solutions for arbitrary out-of-bounds programmatic Core definitions.
 
-Successful movement or undo hides the arrow and cancels pending work, even if undo returns to identical positions. Restart, level replacement, completion, timeout, disposal, or unavailable views invalidate the result. Idle/blocked input preserves it; skin changes do not change the board revision, though a pending rebind invalidates an unavailable view. Requests made while unavailable are dropped, and a valid pending calculation disables the button. Old results/failures cannot replace newer hints. The arrow is a lazy child of the run's presentation root with no collider or ECS entity; its mesh/material/prefab are direct scene dependencies, so no Addressables rebuild is required for hint-only changes. Keep its prefab reference assigned when authoring another gameplay scene.
+Successful movement or undo hides the arrow and cancels pending work, even if undo returns to identical positions. Restart, level replacement, completion, timeout, disposal, or unavailable views invalidate the result. Idle/blocked input preserves it; skin changes do not change the board revision, though a pending rebind invalidates an unavailable view. Requests made while unavailable are dropped, and a valid pending calculation disables the button. Old results/failures cannot replace newer hints. The arrow is a lazy child of the run's presentation root with no collider or ECS entity; its prefab, mesh, and material are Addressable content dependencies. Rebuild Addressables after changing its content or catalog entry. The button stays pending while the visual loads; an asset failure reports hint failure with retry available while gameplay continues.
 
 ## Configure content
 
@@ -47,6 +47,7 @@ Assign addresses in the Addressables Groups window. Use those exact strings in t
 | Player / Alternate (Farmer) | `views/player_alt` | GameObject prefab |
 | Player / Punk | `views/player_punk` | GameObject prefab |
 | Goal / Default | `views/goal` | GameObject prefab |
+| HintArrow / Default | `views/hint_arrow` | HintArrow GameObject prefab |
 | Level index 0 | `levels/level-01` | TextAsset |
 | Level index 1 | `levels/level-02` | TextAsset |
 | Level index 2 | `levels/level-03` | TextAsset |

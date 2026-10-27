@@ -24,6 +24,7 @@ namespace Sokoban.Editor
             {
                 string path = AssetDatabase.GUIDToAssetPath(guid);
                 ViewCatalog catalog = AssetDatabase.LoadAssetAtPath<ViewCatalog>(path);
+                ValidateHintArrow(catalog.Resolve(new ViewKey(ViewKind.HintArrow, SkinId.Default)).Address, entries, path);
                 foreach (ViewCatalog.KindEntry kind in catalog.Entries)
                 foreach (ViewCatalog.SkinEntry skin in kind.Skins)
                 {
@@ -77,6 +78,15 @@ namespace Sokoban.Editor
                 if (schema != null && !schema.IncludeLabelsInCatalog)
                     throw new InvalidOperationException($"{match.address}: config labels are excluded from the catalog.");
             }
+        }
+
+        public static void ValidateHintArrow(string address, IEnumerable<AddressableAssetEntry> entries, string context)
+        {
+            ValidateAddress(address, typeof(GameObject), entries, context);
+            AddressableAssetEntry entry = entries.Single(entry => entry.address == address);
+            GameObject prefab = AssetDatabase.LoadAssetAtPath<GameObject>(entry.AssetPath);
+            if (prefab.GetComponent<HintArrow>() == null)
+                throw new InvalidOperationException($"{context}: address '{address}' must reference a prefab with HintArrow.");
         }
     }
 }

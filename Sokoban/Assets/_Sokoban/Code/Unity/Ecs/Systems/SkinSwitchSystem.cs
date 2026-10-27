@@ -15,6 +15,13 @@ namespace Sokoban.Presentation.Ecs.Systems
         {
             SkinId skin = entity.Get<SkinChangeRequest>().Id;
             
+            if (entity.Has<ViewOwnership>())
+            {
+                entity
+                    .Get<ViewOwnership>()
+                    .ReleaseView();
+            }
+            
             if (entity.Has<TransformComponent>())
             {
                 Transform transform = entity.Get<TransformComponent>().Transform;

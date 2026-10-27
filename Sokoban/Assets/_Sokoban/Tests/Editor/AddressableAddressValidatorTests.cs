@@ -42,6 +42,14 @@ namespace Sokoban.Tests.Editor
             Assert.That(message, Does.Contain("must reference TextAsset, found GameObject"));
         }
 
+        [Test]
+        public void ArrowWithoutTheRequiredFacade_IsRejected()
+        {
+            string message = Assert.Throws<InvalidOperationException>(() =>
+                AddressableAddressValidator.ValidateHintArrow("views/box", Entries(), "HintArrow/Default")).Message;
+            Assert.That(message, Does.Contain("HintArrow/Default").And.Contain("views/box").And.Contain("with HintArrow"));
+        }
+
         private static List<AddressableAssetEntry> Entries()
         {
             var entries = new List<AddressableAssetEntry>();

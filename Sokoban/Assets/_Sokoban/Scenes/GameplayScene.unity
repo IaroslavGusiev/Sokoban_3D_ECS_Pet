@@ -782,7 +782,6 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   levelRoot: {fileID: 643343495}
-  hintArrowPrefab: {fileID: 5086604785174572953, guid: 5632dd1764ea72b4fb8ab716111941ce, type: 3}
 --- !u!114 &2140444732
 MonoBehaviour:
   m_ObjectHideFlags: 0

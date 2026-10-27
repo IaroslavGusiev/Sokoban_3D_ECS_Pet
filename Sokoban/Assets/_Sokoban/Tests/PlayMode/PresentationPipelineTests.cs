@@ -547,8 +547,10 @@ namespace Sokoban.Tests.PlayMode
         {
             GameplaySettings settings = TestGameplaySettings.Create();
             _objects.Add(settings);
-            var factory = new LevelRunFactory(new LevelRoot(CreateObject(rootName).transform), CreateViewProvider(), new LevelPopulator(), new SimulationPipelineFactory(), new ViewPipelineFactory());
-            return new GameplayController(input, source, factory, new TestStaticData { Gameplay = settings }, new HintService(new HintSolver()));
+            var provider = CreateViewProvider();
+            var factory = new LevelRunFactory(new LevelRoot(CreateObject(rootName).transform), provider, new LevelPopulator(), new SimulationPipelineFactory(), new ViewPipelineFactory());
+            return new GameplayController(input, source, new HintCoordinator(new HintService(new HintSolver()), provider),
+                factory, new TestStaticData { Gameplay = settings });
         }
 
         private static void SetField(object target, string name, object value) =>

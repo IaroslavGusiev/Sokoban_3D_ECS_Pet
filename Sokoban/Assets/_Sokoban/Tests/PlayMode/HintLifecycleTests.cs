@@ -167,19 +167,28 @@ namespace Sokoban.Tests.PlayMode
         {
             Fixture f = Create();
             Start(f);
-            var calculation = (HintCalculation)typeof(GameplayController).GetField("_hintCalculation", BindingFlags.Instance | BindingFlags.NonPublic)
-                .GetValue(f.Controller);
             f.Controller.Dispose();
             _controllers.Remove(f.Controller);
             Assert.That(f.Service.Calls[0].Token.IsCancellationRequested, Is.True);
             f.Service.Calls[0].Source.SetException(new InvalidOperationException("late disposed failure"));
             yield return null;
-            Assert.That(calculation.Task.IsCompleted, Is.True);
-            Assert.That(calculation.Task.IsFaulted, Is.False);
-            Assert.That(calculation.Task.GetAwaiter().GetResult().Error.Message, Is.EqualTo("late disposed failure"));
-            Assert.DoesNotThrow(() => calculation.Cancel());
             Assert.That(f.Controller.HintStatus, Is.EqualTo(HintStatus.None));
             Assert.That(f.Root.childCount, Is.Zero);
+        }
+
+        [UnityTest]
+        public IEnumerator OperationObservesLateFailureAndCanCancelAfterItsSourceIsDisposed()
+        {
+            var service = new ControlledService();
+            var operation = new HintOperation(service, LevelParser.Parse("#####\n#@$.#\n#####"));
+            operation.Cancel();
+            Assert.That(service.Calls[0].Token.IsCancellationRequested, Is.True);
+            service.Calls[0].Source.SetException(new InvalidOperationException("late disposed failure"));
+            yield return null;
+            Assert.That(operation.Task.IsCompleted, Is.True);
+            Assert.That(operation.Task.IsFaulted, Is.False);
+            Assert.That(operation.Task.GetAwaiter().GetResult().Error.Message, Is.EqualTo("late disposed failure"));
+            Assert.DoesNotThrow(() => operation.Cancel());
         }
 
         [UnityTest]
@@ -231,7 +240,7 @@ namespace Sokoban.Tests.PlayMode
             yield return Apply(f);
             Assert.That(f.Root.GetComponentInChildren<HintArrow>(), Is.SameAs(arrow));
             Assert.That(f.Root.GetComponentsInChildren<HintArrow>(true).Length, Is.EqualTo(1));
-            Assert.That(f.Provider.Requests, Is.EqualTo(loads + 1), "Only the intentional skin change requested a view.");
+            Assert.That(f.Provider.Requests, Is.EqualTo(loads + 2), "Only the first arrow load and the intentional skin change requested views; the arrow instance is reused.");
         }
 
         [UnityTest]
@@ -280,6 +289,193 @@ namespace Sokoban.Tests.PlayMode
             Assert.That(f.Controller.Moves, Is.Zero);
             Assert.That(SimulationOf(f).BoardRevision, Is.Zero);
             Assert.That(ActiveArrows(f), Is.EqualTo(1));
+        }
+
+        [UnityTest]
+        public IEnumerator DelayedArrowKeepsTheHintPendingAndRepeatedRequestsCoalesce()
+        {
+            Fixture f = Create();
+            yield return BeginArrow(f);
+            Assert.That(f.Controller.HintStatus, Is.EqualTo(HintStatus.Calculating));
+            Assert.That(f.Controller.HintMove, Is.EqualTo(default(MoveCommand)));
+            Assert.That(f.Controller.CanHint, Is.False);
+            for (int index = 0; index < 3; index++)
+            {
+                f.Controller.RequestHint();
+                f.Controller.Tick(1f);
+            }
+            Assert.That(f.Service.Calls.Count, Is.EqualTo(1));
+            Assert.That(f.Provider.ArrowLoads.Count, Is.EqualTo(1));
+            Assert.That(f.Controller.RemainingSeconds, Is.EqualTo(57f));
+            Assert.That(f.Controller.Moves, Is.Zero);
+            f.Provider.ArrowLoads[0].Source.TrySetResult(f.Provider.ArrowPrefab);
+            yield return null;
+            Assert.That(ActiveArrows(f), Is.Zero, "Loading alone must never apply a display outside the controller tick.");
+            yield return Apply(f);
+            Assert.That(ActiveArrows(f), Is.EqualTo(1));
+            Assert.That(f.Controller.HintMove, Is.EqualTo(MoveCommand.Right));
+        }
+
+        [UnityTest]
+        public IEnumerator MovementInvalidatesADelayedArrow()
+        {
+            Fixture f = Create();
+            yield return BeginArrow(f);
+            Move(f, MoveCommand.Right);
+            Assert.That(f.Provider.ArrowLoads[0].Token.IsCancellationRequested, Is.True);
+            f.Provider.ArrowLoads[0].Source.TrySetResult(f.Provider.ArrowPrefab);
+            yield return null;
+            f.Controller.Tick(0f);
+            Assert.That(f.Controller.HintStatus, Is.EqualTo(HintStatus.None));
+            Assert.That(ActiveArrows(f), Is.Zero);
+        }
+
+        [UnityTest]
+        public IEnumerator UndoInvalidatesADelayedArrow()
+        {
+            Fixture f = Create();
+            Move(f, MoveCommand.Right);
+            yield return BeginArrow(f);
+            f.Controller.RequestUndo();
+            f.Controller.Tick(0.16f);
+            Assert.That(f.Controller.Moves, Is.Zero);
+            Assert.That(f.Provider.ArrowLoads[0].Token.IsCancellationRequested, Is.True);
+            f.Provider.ArrowLoads[0].Source.TrySetResult(f.Provider.ArrowPrefab);
+            yield return null;
+            f.Controller.Tick(0f);
+            Assert.That(f.Controller.HintStatus, Is.EqualTo(HintStatus.None));
+            Assert.That(ActiveArrows(f), Is.Zero);
+        }
+
+        [UnityTest]
+        public IEnumerator ReplacementRejectsTheOldArrowWhileTheNewRequestLoads()
+        {
+            Fixture f = Create();
+            yield return BeginArrow(f);
+            Transform previousRoot = f.Root.GetChild(0);
+            f.Controller.RequestRestart();
+            f.Controller.Tick(0f);
+            f.Controller.Tick(0f);
+            yield return BeginArrow(f, 1);
+            Assert.That(f.Provider.ArrowLoads[0].Token.IsCancellationRequested, Is.True);
+            f.Provider.ArrowLoads[0].Source.TrySetResult(f.Provider.ArrowPrefab);
+            yield return null;
+            f.Controller.Tick(0f);
+            Assert.That(previousRoot == null, Is.True);
+            Assert.That(ActiveArrows(f), Is.Zero);
+            Assert.That(f.Controller.HintStatus, Is.EqualTo(HintStatus.Calculating));
+            f.Provider.ArrowLoads[1].Source.TrySetResult(f.Provider.ArrowPrefab);
+            yield return Apply(f);
+            Assert.That(ActiveArrows(f), Is.EqualTo(1));
+        }
+
+        [UnityTest]
+        public IEnumerator ExplicitInvalidationRejectsAnOlderLoadOnTheSameRunAndRevision()
+        {
+            Fixture f = Create();
+            yield return BeginArrow(f);
+            f.Hints.Invalidate();
+            yield return BeginArrow(f, 1);
+            f.Provider.ArrowLoads[0].Source.TrySetException(new InvalidOperationException("stale arrow failure"));
+            yield return null;
+            f.Controller.Tick(0f);
+            Assert.That(f.Controller.HintStatus, Is.EqualTo(HintStatus.Calculating));
+            Assert.That(ActiveArrows(f), Is.Zero);
+            Assert.That(SimulationOf(f).BoardRevision, Is.Zero);
+            f.Provider.ArrowLoads[1].Source.TrySetResult(f.Provider.ArrowPrefab);
+            yield return Apply(f);
+            Assert.That(ActiveArrows(f), Is.EqualTo(1));
+        }
+
+        [UnityTest]
+        public IEnumerator UnavailableViewsInvalidateADelayedArrowEvenAfterRebinding()
+        {
+            Fixture f = Create();
+            yield return BeginArrow(f);
+            f.Provider.Pending = new UniTaskCompletionSource<GameObject>();
+            f.Controller.RequestNextSkin();
+            f.Controller.Tick(0f);
+            Assert.That(f.Provider.ArrowLoads[0].Token.IsCancellationRequested, Is.True);
+            Assert.That(f.Controller.HintStatus, Is.EqualTo(HintStatus.None));
+            f.Provider.Pending.TrySetResult(f.Provider.Prefab);
+            f.Controller.Tick(0f);
+            f.Provider.ArrowLoads[0].Source.TrySetResult(f.Provider.ArrowPrefab);
+            yield return null;
+            f.Controller.Tick(0f);
+            Assert.That(f.Controller.CanHint, Is.True);
+            Assert.That(ActiveArrows(f), Is.Zero);
+        }
+
+        [UnityTest]
+        public IEnumerator DisposalRejectsLateArrowSuccess() => ArrowAfterDisposal(false);
+
+        [UnityTest]
+        public IEnumerator DisposalObservesLateArrowFailure() => ArrowAfterDisposal(true);
+
+        private IEnumerator ArrowAfterDisposal(bool failure)
+        {
+            Fixture f = Create();
+            yield return BeginArrow(f);
+            f.Controller.Dispose();
+            _controllers.Remove(f.Controller);
+            Assert.That(f.Provider.ArrowLoads[0].Token.IsCancellationRequested, Is.True);
+            if (failure) f.Provider.ArrowLoads[0].Source.TrySetException(new InvalidOperationException("late arrow failure"));
+            else f.Provider.ArrowLoads[0].Source.TrySetResult(f.Provider.ArrowPrefab);
+            yield return null;
+            Assert.That(f.Root.childCount, Is.Zero);
+            Assert.That(f.Controller.HintStatus, Is.EqualTo(HintStatus.None));
+            Assert.That(f.Controller.CanHint, Is.False);
+        }
+
+        [UnityTest]
+        public IEnumerator ArrowFailureLeavesGameplayUsableAndAllowsRetry()
+        {
+            Fixture f = Create();
+            yield return BeginArrow(f);
+            f.Provider.ArrowLoads[0].Source.TrySetException(new InvalidOperationException("arrow load failure"));
+            yield return Apply(f);
+            Assert.That(f.Controller.HintStatus, Is.EqualTo(HintStatus.Failed));
+            Assert.That(f.Controller.Phase, Is.EqualTo(GameplayPhase.Playing));
+            Assert.That(f.Controller.CanHint, Is.True);
+            Assert.That(ActiveArrows(f), Is.Zero);
+            Move(f, MoveCommand.Right);
+            Assert.That(f.Controller.Moves, Is.EqualTo(1));
+            yield return BeginArrow(f, 1);
+            f.Provider.ArrowLoads[1].Source.TrySetResult(f.Provider.ArrowPrefab);
+            yield return Apply(f);
+            Assert.That(f.Controller.HintStatus, Is.EqualTo(HintStatus.Available));
+        }
+
+        [UnityTest]
+        public IEnumerator RestartAndNextLevelKeepPriorityOverQueuedHints()
+        {
+            Fixture f = Create();
+            f.Controller.RequestHint();
+            f.Controller.RequestRestart();
+            f.Controller.Tick(0f);
+            f.Controller.Tick(0f);
+            Assert.That(f.Service.Calls, Is.Empty);
+            f.Controller.RequestHint();
+            f.Input.NextLevelPressed = true;
+            f.Controller.Tick(0f);
+            f.Input.NextLevelPressed = false;
+            f.Controller.Tick(0f);
+            Assert.That(f.Service.Calls, Is.Empty);
+            Assert.That(f.Controller.LevelNumber, Is.EqualTo(2));
+            yield return null;
+        }
+
+        private IEnumerator BeginArrow(Fixture f, int requestIndex = 0)
+        {
+            f.Provider.DelayArrow = true;
+            Start(f);
+            f.Service.Calls[requestIndex].Source.SetResult(new HintResult(HintOutcome.Found, MoveCommand.Right));
+            for (int frame = 0; frame < 20 && f.Provider.ArrowLoads.Count <= requestIndex; frame++)
+            {
+                yield return null;
+                f.Controller.Tick(0f);
+            }
+            Assert.That(f.Provider.ArrowLoads.Count, Is.EqualTo(requestIndex + 1));
         }
 
 #if UNITY_EDITOR
@@ -342,15 +538,17 @@ namespace Sokoban.Tests.PlayMode
             var root = CreateObject("Hint run root").transform;
             var prefab = CreateObject("HintArrow prefab").AddComponent<HintArrow>();
             prefab.gameObject.SetActive(false);
-            var factory = new LevelRunFactory(new LevelRoot(root), provider, new LevelPopulator(), new SimulationPipelineFactory(), new ViewPipelineFactory(), prefab);
+            provider.ArrowPrefab = prefab.gameObject;
+            var factory = new LevelRunFactory(new LevelRoot(root), provider, new LevelPopulator(), new SimulationPipelineFactory(), new ViewPipelineFactory());
             GameplaySettings settings = TestGameplaySettings.Create(limit);
             _objects.Add(settings);
             level ??= LevelParser.Parse("########\n#@-$--.#\n########");
-            var controller = new GameplayController(input, new Source(level), factory, new TestStaticData { Gameplay = settings }, service ?? controlled);
+            var hints = new HintCoordinator(service ?? controlled, provider);
+            var controller = new GameplayController(input, new Source(level), hints, factory, new TestStaticData { Gameplay = settings });
             _controllers.Add(controller);
             controller.Initialize();
             controller.Tick(0f);
-            return new Fixture(controller, input, controlled, provider, root);
+            return new Fixture(controller, hints, input, controlled, provider, root);
         }
 
         private GameObject CreateObject(string name)
@@ -363,14 +561,16 @@ namespace Sokoban.Tests.PlayMode
         private sealed class Fixture
         {
             public GameplayController Controller { get; }
+            public HintCoordinator Hints { get; }
             public Input Input { get; }
             public ControlledService Service { get; }
             public Provider Provider { get; }
             public Transform Root { get; }
 
-            public Fixture(GameplayController controller, Input input, ControlledService service, Provider provider, Transform root)
+            public Fixture(GameplayController controller, HintCoordinator hints, Input input, ControlledService service, Provider provider, Transform root)
             {
                 Controller = controller;
+                Hints = hints;
                 Input = input;
                 Service = service;
                 Provider = provider;
@@ -383,7 +583,7 @@ namespace Sokoban.Tests.PlayMode
             public MoveCommand Move;
             public MoveCommand ReadMove() => Move;
             public bool RestartPressed => false;
-            public bool NextLevelPressed => false;
+            public bool NextLevelPressed { get; set; }
             public bool NextSkinPressed => false;
             public bool UndoPressed => false;
         }
@@ -399,12 +599,25 @@ namespace Sokoban.Tests.PlayMode
         private sealed class Provider : IViewProvider
         {
             public GameObject Prefab;
+            public GameObject ArrowPrefab;
+            public bool DelayArrow;
+            public List<ArrowLoad> ArrowLoads { get; } = new();
             public int Requests;
             public UniTaskCompletionSource<GameObject> Pending;
             public UniTask<GameObject> LoadAsync(ViewKey key, CancellationToken token)
             {
                 Requests++;
-                return Pending?.Task ?? UniTask.FromResult(Prefab);
+                if (key.Kind != ViewKind.HintArrow) return Pending?.Task ?? UniTask.FromResult(Prefab);
+                var load = new ArrowLoad(token);
+                ArrowLoads.Add(load);
+                return DelayArrow ? load.Source.Task : UniTask.FromResult(ArrowPrefab);
+            }
+
+            public sealed class ArrowLoad
+            {
+                public CancellationToken Token { get; }
+                public UniTaskCompletionSource<GameObject> Source { get; } = new();
+                public ArrowLoad(CancellationToken token) => Token = token;
             }
         }
 

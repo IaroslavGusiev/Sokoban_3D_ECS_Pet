@@ -1,6 +1,7 @@
 using System;
 using Sokoban.Core;
 using Sokoban.Core.Commands;
+using UnityEngine;
 
 namespace Sokoban.Presentation
 {
@@ -26,16 +27,16 @@ namespace Sokoban.Presentation
 
         public bool CanHint => ViewStatus == ViewStatus.Ready && _viewLayer.IsMoving == false && IsCompleted == false && IsTimedOut == false;
         public long BoardRevision => _simulation.BoardRevision;
+        public bool HasHintArrow => _viewLayer.HasHintArrow;
 
         public LevelRun(LevelRoot root, LevelDefinition level, IViewProvider provider, LevelPopulator populator,
-            SimulationPipelineFactory simulationPipelineFactory, ViewPipelineFactory viewPipelineFactory, RunOptions options,
-            HintArrow hintArrowPrefab = null)
+            SimulationPipelineFactory simulationPipelineFactory, ViewPipelineFactory viewPipelineFactory, RunOptions options)
         {
             _level = level;
             try
             {
                 _simulation = new Simulation(level, populator, options.TimeLimitSeconds, simulationPipelineFactory);
-                _viewLayer = new ViewLayer(root, _simulation.World, provider, viewPipelineFactory, options, hintArrowPrefab);
+                _viewLayer = new ViewLayer(root, _simulation.World, provider, viewPipelineFactory, options);
                 _viewLayer.Tick(0f);
             }
             catch
@@ -100,8 +101,8 @@ namespace Sokoban.Presentation
             return new LevelDefinition(_level.Width, _level.Height, snapshot.PlayerPosition, _level.Walls, snapshot.BoxPositions, _level.Goals);
         }
 
-        public void ShowHint(MoveCommand move) =>
-            _viewLayer.ShowHint(_simulation.CaptureSnapshot().PlayerPosition, move);
+        public void ShowHint(GameObject prefab, MoveCommand move) =>
+            _viewLayer.ShowHint(prefab, _simulation.CaptureSnapshot().PlayerPosition, move);
 
         public void HideHint() =>
             _viewLayer.HideHint();

@@ -1,21 +1,54 @@
 using System;
+using UnityEngine;
+using Sokoban.Core;
 using System.Threading;
 using System.Threading.Tasks;
-using Sokoban.Core;
 
 namespace Sokoban.Presentation
 {
-    internal sealed class HintCalculation
+    internal sealed class HintOperation
     {
         private readonly CancellationOwner _cancellation = new();
+        private CancellationOwner _arrowCancellation;
 
         public Task<Completion> Task { get; }
+        public Task<ArrowCompletion> ArrowTask { get; private set; }
 
-        public HintCalculation(IHintService service, LevelDefinition board) =>
+        public HintOperation(IHintService service, LevelDefinition board) =>
             Task = ObserveAsync(service, board, _cancellation);
 
-        public void Cancel() =>
+        public void Cancel()
+        {
             _cancellation.Cancel();
+            _arrowCancellation?.Cancel();
+        }
+
+        public void LoadArrow(IViewProvider provider)
+        {
+            _arrowCancellation = new CancellationOwner();
+            ArrowTask = ObserveArrowAsync(provider, _arrowCancellation);
+        }
+
+        private static async Task<ArrowCompletion> ObserveArrowAsync(IViewProvider provider, CancellationOwner cancellation)
+        {
+            try
+            {
+                GameObject prefab = await provider.LoadAsync(new ViewKey(ViewKind.HintArrow, SkinId.Default), cancellation.Token);
+                return new ArrowCompletion(prefab, null, false);
+            }
+            catch (OperationCanceledException)
+            {
+                return new ArrowCompletion(null, null, true);
+            }
+            catch (Exception exception)
+            {
+                return new ArrowCompletion(null, exception, false);
+            }
+            finally
+            {
+                cancellation.Dispose();
+            }
+        }
 
         private static async Task<Completion> ObserveAsync(IHintService service, LevelDefinition board, CancellationOwner cancellation)
         {
@@ -52,6 +85,20 @@ namespace Sokoban.Presentation
             }
         }
 
+        internal readonly struct ArrowCompletion
+        {
+            public GameObject Prefab { get; }
+            public Exception Error { get; }
+            public bool IsCanceled { get; }
+
+            public ArrowCompletion(GameObject prefab, Exception error, bool isCanceled)
+            {
+                Prefab = prefab;
+                Error = error;
+                IsCanceled = isCanceled;
+            }
+        }
+
         private sealed class CancellationOwner : IDisposable
         {
             private readonly CancellationTokenSource _source = new();
@@ -64,7 +111,10 @@ namespace Sokoban.Presentation
             {
                 lock (_gate)
                 {
-                    if (_disposed == false) _source.Cancel();
+                    if (_disposed == false)
+                    {
+                        _source.Cancel();
+                    }
                 }
             }
 
@@ -72,7 +122,11 @@ namespace Sokoban.Presentation
             {
                 lock (_gate)
                 {
-                    if (_disposed) return;
+                    if (_disposed)
+                    {
+                        return;
+                    }
+                    
                     _disposed = true;
                     _source.Dispose();
                 }

@@ -37,3 +37,7 @@ MonoBehaviour:
     Skins:
     - Skin: 0
       Address: views/goal
+  - Kind: 5
+    Skins:
+    - Skin: 0
+      Address: views/hint_arrow

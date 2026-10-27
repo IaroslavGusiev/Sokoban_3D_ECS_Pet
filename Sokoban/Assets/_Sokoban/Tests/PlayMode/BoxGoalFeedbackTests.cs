@@ -358,7 +358,8 @@ namespace Sokoban.Tests.PlayMode
             try
             {
                 var factory = new LevelRunFactory(new LevelRoot(parent.transform), provider, new LevelPopulator(), new SimulationPipelineFactory(), new ViewPipelineFactory());
-                using var controller = new GameplayController(input, source, factory, new TestStaticData { Gameplay = settings }, new HintService(new HintSolver()));
+                using var controller = new GameplayController(input, source, new HintCoordinator(new HintService(new HintSolver()), provider),
+                    factory, new TestStaticData { Gameplay = settings });
                 controller.Initialize();
                 controller.Tick(0f);
                 input.Move = MoveCommand.Right;
