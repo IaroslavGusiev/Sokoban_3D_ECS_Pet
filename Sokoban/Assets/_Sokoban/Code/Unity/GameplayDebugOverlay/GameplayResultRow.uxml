@@ -1,0 +1,8 @@
+<ui:UXML xmlns:ui="UnityEngine.UIElements">
+    <ui:Style src="GameplayOverlay.uss" />
+    <ui:VisualElement class="result-row">
+        <ui:Label name="rowLevel" class="result-level" picking-mode="Ignore" />
+        <ui:Label name="rowMoves" class="result-moves" picking-mode="Ignore" />
+        <ui:Label name="rowTime" class="result-time" picking-mode="Ignore" />
+    </ui:VisualElement>
+</ui:UXML>

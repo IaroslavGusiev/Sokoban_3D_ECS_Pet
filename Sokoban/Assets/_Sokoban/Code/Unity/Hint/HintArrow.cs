@@ -18,8 +18,10 @@ namespace Sokoban.Presentation
                 MoveCommand.Right => Vector3.right,
                 _ => throw new ArgumentOutOfRangeException(nameof(move))
             };
+            
             transform.position = GridCoordinates.ToWorld(player) + Vector3.up * 1.8f + direction * 0.55f;
             transform.rotation = Quaternion.LookRotation(direction);
+            
             gameObject.SetActive(true);
         }
     }

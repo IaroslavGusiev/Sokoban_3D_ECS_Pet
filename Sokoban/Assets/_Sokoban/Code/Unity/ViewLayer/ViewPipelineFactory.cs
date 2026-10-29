@@ -1,8 +1,8 @@
 using DefaultEcs;
-using DefaultEcs.System;
 using Sokoban.Core;
-using Sokoban.Presentation.Ecs.Systems;
+using DefaultEcs.System;
 using System.Collections.Generic;
+using Sokoban.Presentation.Ecs.Systems;
 
 namespace Sokoban.Presentation
 {
@@ -11,7 +11,7 @@ namespace Sokoban.Presentation
         public SystemPipeline Create(World world, ViewContext context) =>
             new(CreateSystems(world, context));
 
-        private IEnumerable<ISystem<float>> CreateSystems(World world, ViewContext context)
+        private static IEnumerable<ISystem<float>> CreateSystems(World world, ViewContext context)
         {
             yield return new SkinSwitchSystem(world);
             yield return new ViewBindingSystem(world, context);

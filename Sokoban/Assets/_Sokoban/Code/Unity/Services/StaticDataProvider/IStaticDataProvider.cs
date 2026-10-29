@@ -10,6 +10,7 @@ namespace Sokoban.Presentation
         
         UniTask LoadAsync(CancellationToken cancellationToken);
 
+        BackgroundCatalog GetBackgroundCatalog();
         ViewCatalog GetViewCatalog();
         GameplaySettings GetGameplaySettings();
         LevelConfig GetLevelConfig(int levelIndex);

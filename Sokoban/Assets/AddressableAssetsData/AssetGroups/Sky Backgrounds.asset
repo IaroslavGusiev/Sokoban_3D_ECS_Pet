@@ -1,0 +1,78 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: bbb281ee3bf0b054c82ac2347e9e782c, type: 3}
+  m_Name: Sky Backgrounds
+  m_EditorClassIdentifier: 
+  m_GroupName: Sky Backgrounds
+  m_GUID: 8d89caf28e7f1044788ea4fb1db4b70c
+  m_SerializeEntries:
+  - m_GUID: 59ebe84372446a44581be3063aada61f
+    m_Address: backgrounds/cumulus-02
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 5bda7439e49a7a042ad3ba70fd7a3f06
+    m_Address: backgrounds/cumulus-05
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 623937be4dbbf4f479b0c751a9ef22ca
+    m_Address: backgrounds/cumulus-09
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 70510badcaeff3443a767c19b5ea9111
+    m_Address: backgrounds/cumulus-01
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 751c610d5cc0f7b4c91e188d136ee2fd
+    m_Address: backgrounds/cumulus-04
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 82ce2716c6fc85e4d88e0aacad7833d7
+    m_Address: backgrounds/cumulus-08
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: a1842b624c3690d4ea1d5e00d0ee8422
+    m_Address: backgrounds/cumulus-03
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: a967d00c1ff7bf340a4b37e1e5c5ea47
+    m_Address: backgrounds/cumulus-07
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: b883adc8bbf91f647b232c3cb607c044
+    m_Address: backgrounds/cumulus-10
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: e76c82c9db70afb40907a7b2afb76f01
+    m_Address: backgrounds/cumulus-06
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  m_ReadOnly: 0
+  m_Settings: {fileID: 11400000, guid: 93b48db6ca1099c42af1de7161c9eae1, type: 2}
+  m_SchemaSet:
+    m_Schemas:
+    - {fileID: 11400000, guid: cd37234ec8aafec46bb8459755050531, type: 2}
+    - {fileID: 11400000, guid: bf9ba589ea94b34468cebb263c9b99d4, type: 2}
+    m_SchemaDisplayOrder:
+    - Sky Backgrounds_BundledAssetGroupSchema
+    - Sky Backgrounds_ContentUpdateGroupSchema
+  m_IncludeInBuild: 1
+  m_IncludeInBuildMigrated: 1

@@ -32,6 +32,7 @@ namespace Sokoban.Presentation.Ecs.Adapters
             if (animator != null)
             {
                 animator.StopAndRestore();
+                animator.SetOccupied(false);
             }
         }
 

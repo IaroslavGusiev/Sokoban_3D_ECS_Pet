@@ -18,7 +18,9 @@ namespace Sokoban.Presentation
         private readonly LevelRunFactory _runFactory;
         private readonly IStaticDataProvider _staticData;
         private readonly HintCoordinator _hints;
+        private readonly BackgroundCoordinator _backgrounds;
         private readonly List<LevelResult> _results = new();
+        private readonly CharacterSelection _characters = new();
         private readonly CancellationTokenSource _cancellation = new();
 
         private LevelRun _run;
@@ -26,6 +28,7 @@ namespace Sokoban.Presentation
 
         private int _levelIndex;
         private SkinId _playerSkin;
+        private bool _hasConfirmedCharacter;
         private bool _undoRequested;
         private float _completionTimer;
         private bool _restartRequested;
@@ -43,23 +46,38 @@ namespace Sokoban.Presentation
 
         public bool CanRestart => Phase != GameplayPhase.Loading;
 
-        public bool CanSwitchSkin => Phase != GameplayPhase.Loading && _run != null;
+        internal bool CanSwitchSkin => Phase != GameplayPhase.Loading && _run is { IsPlayerDeferred: false };
 
-        public bool CanUndo => Phase == GameplayPhase.Playing && _run != null && _run.CanUndo;
+        public IReadOnlyList<SkinId> Characters => _characters.Choices;
+        public SkinId SelectedCharacter => _characters.Selected;
+        public bool CanChooseCharacter => Phase is GameplayPhase.SelectingCharacter or GameplayPhase.CharacterFailed;
+        public bool CanConfirmCharacter => CanChooseCharacter && Characters.Count > 0;
+        
+        public bool CanUndo => Phase == GameplayPhase.Playing && _run is { CanUndo: true };
+
+        public bool CanNextBackground => Phase != GameplayPhase.Loading && _backgrounds.CanPreview;
+        
+        public BackgroundStatus BackgroundStatus => _backgrounds.Status;
+        
+        public string BackgroundName => _backgrounds.SelectedName;
 
         public bool CanHint => _hints.CanRequest(_run, Phase);
+        
         public HintStatus HintStatus => _hints.Status;
+        
         public MoveCommand HintMove => _hints.Move;
         
         internal GameplayController(
             IPlayerInput input,
             ILevelSource source,
             HintCoordinator hints,
+            BackgroundCoordinator backgrounds,
             LevelRunFactory runFactory,
             IStaticDataProvider staticData)
         {
             _input = input;
             _hints = hints;
+            _backgrounds = backgrounds;
             _source = source;
             _runFactory = runFactory;
             _staticData = staticData;
@@ -78,9 +96,15 @@ namespace Sokoban.Presentation
             
             _cancellation.Cancel();
             _cancellation.Dispose();
-            _hints.Dispose();
-            
-            ReleaseRun();
+            try
+            {
+                _hints.Dispose();
+                ReleaseRun();
+            }
+            finally
+            {
+                _backgrounds.Dispose();
+            }
         }
 
         public void RequestRestart()
@@ -91,11 +115,27 @@ namespace Sokoban.Presentation
             }
         }
 
-        public void RequestNextSkin()
+        internal void RequestNextSkin()
         {
             if (CanSwitchSkin)
             {
                 _nextSkinRequested = true;
+            }
+        }
+
+        public void RequestCharacter(SkinId skin)
+        {
+            if (CanChooseCharacter)
+            {
+                _characters.RequestSelection(skin);
+            }
+        }
+
+        public void RequestConfirmCharacter()
+        {
+            if (CanConfirmCharacter)
+            {
+                _characters.RequestConfirmation();
             }
         }
 
@@ -107,6 +147,9 @@ namespace Sokoban.Presentation
             }
         }
         
+        public void RequestNextBackground() =>
+            _backgrounds.RequestNext();
+
         public void RequestHint() => 
             _hints.Request(_run, Phase);
 
@@ -126,6 +169,23 @@ namespace Sokoban.Presentation
 
             if (Phase == GameplayPhase.Loading)
             {
+                _backgrounds.Update();
+                return;
+            }
+
+            if (Phase is GameplayPhase.SelectingCharacter or GameplayPhase.BindingCharacter or GameplayPhase.CharacterFailed)
+            {
+                if (restartRequested)
+                {
+                    Restart();
+                }
+                else
+                {
+                    TickCharacter(deltaTime);
+                }
+
+                _hints.Update(_run, Phase);
+                _backgrounds.Update();
                 return;
             }
 
@@ -144,11 +204,12 @@ namespace Sokoban.Presentation
             }
             
             _hints.Update(_run, Phase);
+            _backgrounds.Update();
         }
 
         private void HandleSkinInput(bool requested)
         {
-            if (_run != null && (requested || _input.NextSkinPressed))
+            if (_run != null && requested)
             {
                 _playerSkin = SkinCycle.Next(_playerSkin);
                 _run.SetPlayerSkin(_playerSkin);
@@ -181,6 +242,10 @@ namespace Sokoban.Presentation
                 case GameplayPhase.BindingViews:
                 case GameplayPhase.ViewsFailed:
                     TickBinding(deltaTime);
+                    if (Phase == GameplayPhase.SelectingCharacter)
+                    {
+                        return TickResult.SkipCommands;
+                    }
                     break;
                 
                 case GameplayPhase.Playing:
@@ -207,10 +272,53 @@ namespace Sokoban.Presentation
             
             TransitionTo(_run.ViewStatus switch
             {
-                ViewStatus.Ready => GameplayPhase.Playing,
-                ViewStatus.Failed => GameplayPhase.ViewsFailed,
+                ViewStatus.Ready => _run.IsPlayerDeferred ? GameplayPhase.SelectingCharacter : GameplayPhase.Playing,
+                ViewStatus.Failed => Phase == GameplayPhase.BindingViews
+                                     && _run.HasPlayerFailure
+                                     && _run.HasBoardFailure == false
+                    ? GameplayPhase.CharacterFailed
+                    : GameplayPhase.ViewsFailed,
                 _ => GameplayPhase.BindingViews
             });
+        }
+
+        private void TickCharacter(float deltaTime)
+        {
+            if (Phase != GameplayPhase.BindingCharacter)
+            {
+                SkinId previous = _characters.Selected;
+                if (_characters.ConsumeConfirmation(out SkinId skin))
+                {
+                    _playerSkin = skin;
+                    _hasConfirmedCharacter = true;
+                    _run.SetPlayerSkin(skin);
+                    TransitionTo(GameplayPhase.BindingCharacter);
+                }
+                else if (Phase == GameplayPhase.CharacterFailed && skin != previous)
+                {
+                    TransitionTo(GameplayPhase.SelectingCharacter);
+                }
+            }
+
+            _run.TickView(deltaTime);
+            if (_run.HasBoardFailure)
+            {
+                TransitionTo(GameplayPhase.ViewsFailed);
+                return;
+            }
+
+            if (Phase == GameplayPhase.BindingCharacter)
+            {
+                if (_run.ViewStatus == ViewStatus.Failed)
+                {
+                    TransitionTo(GameplayPhase.CharacterFailed);
+                }
+                else if (_run.ViewStatus == ViewStatus.Ready && _input.IsNeutral)
+                {
+                    // The selection's key/click must be released before gameplay can sample input.
+                    TransitionTo(GameplayPhase.Playing);
+                }
+            }
         }
 
         private TickResult TickPlaying(float deltaTime, bool undoRequested)
@@ -294,18 +402,19 @@ namespace Sokoban.Presentation
         {
             if (Phase == GameplayPhase.LevelFailed)
             {
-                LoadLevelAsync(_levelIndex, _cancellation.Token).Forget();
+                LoadLevelAsync(_levelIndex, _cancellation.Token, _hasConfirmedCharacter == false).Forget();
             }
             else
             {
                 ReleaseRun();
-                StartRun();
+                StartRun(_hasConfirmedCharacter == false);
             }
         }
 
-        private async UniTask LoadLevelAsync(int index, CancellationToken ct)
+        private async UniTask LoadLevelAsync(int index, CancellationToken ct, bool chooseCharacter = true)
         {
             TransitionTo(GameplayPhase.Loading);
+            _backgrounds.BeginLevelEntry();
             _levelIndex = index;
 
             try
@@ -328,7 +437,11 @@ namespace Sokoban.Presentation
                 ReleaseRun();
                 _level = next;
                 
-                StartRun();
+                StartRun(chooseCharacter);
+                if (Phase == GameplayPhase.BindingViews)
+                {
+                    _backgrounds.EnterLevel();
+                }
             }
             catch (OperationCanceledException)
             {
@@ -341,12 +454,14 @@ namespace Sokoban.Presentation
             }
         }
 
-        private void StartRun()
+        private void StartRun(bool chooseCharacter)
         {
             try
             {
+                _characters.Begin(_staticData.GetViewCatalog(), _playerSkin);
+
                 GameplaySettings settings = _staticData.GetGameplaySettings();
-                _run = _runFactory.Create(_level, new RunOptions(_playerSkin, settings.LevelTimeLimitSeconds, settings.MoveDurationSeconds));
+                _run = _runFactory.Create(_level, new RunOptions(_playerSkin, settings.LevelTimeLimitSeconds, settings.MoveDurationSeconds, chooseCharacter));
             }
             catch (Exception exception)
             {
@@ -360,6 +475,7 @@ namespace Sokoban.Presentation
 
         private void ReleaseRun()
         {
+            _characters.ClearRequests();
             _hints.Invalidate();
             
             try

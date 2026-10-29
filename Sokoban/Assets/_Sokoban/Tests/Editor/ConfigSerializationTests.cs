@@ -47,6 +47,30 @@ namespace Sokoban.Tests.Editor
         }
 
         [Test]
+        public void BackgroundCatalog_RoundTripsOrderedAddressesAndOrientation()
+        {
+            var config = ScriptableObject.CreateInstance<BackgroundCatalog>();
+            var restored = ScriptableObject.CreateInstance<BackgroundCatalog>();
+            try
+            {
+                config.Presets.Add(new BackgroundPreset("First", "backgrounds/first", 45f, 8.5f));
+                config.Presets.Add(new BackgroundPreset("Second", "backgrounds/second", 90f, 10f));
+                JsonUtility.FromJsonOverwrite(JsonUtility.ToJson(config), restored);
+                Assert.That(restored.Presets.Count, Is.EqualTo(2));
+                Assert.That(restored.Presets[0].Name, Is.EqualTo("First"));
+                Assert.That(restored.Presets[0].Address, Is.EqualTo("backgrounds/first"));
+                Assert.That(restored.Presets[0].RotationDegrees, Is.EqualTo(45f));
+                Assert.That(restored.Presets[0].Exposure, Is.EqualTo(8.5f));
+                Assert.That(restored.Presets[1].Address, Is.EqualTo("backgrounds/second"));
+            }
+            finally
+            {
+                Object.DestroyImmediate(config);
+                Object.DestroyImmediate(restored);
+            }
+        }
+
+        [Test]
         public void ViewCatalog_RoundTripsSerializedSkinEntries()
         {
             var config = ScriptableObject.CreateInstance<ViewCatalog>();

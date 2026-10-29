@@ -3,6 +3,8 @@
     "rootNamespace": "Sokoban.Presentation",
     "references": [
         "Sokoban.Core",
+        "Unity.RenderPipelines.Core.Runtime",
+        "Unity.RenderPipelines.HighDefinition.Runtime",
         "PrimeTween.Runtime",
 
         "Unity.InputSystem",

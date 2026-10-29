@@ -5,7 +5,8 @@ namespace Sokoban.Presentation
 {
     public sealed class KeyboardMoveInput : IPlayerInput
     {
-        public bool NextSkinPressed => Keyboard.current.kKey.wasPressedThisFrame;
+        public bool IsNeutral => Keyboard.current.anyKey.isPressed == false
+                                 && (Mouse.current == null || Mouse.current.leftButton.isPressed == false);
         public bool UndoPressed => Keyboard.current.zKey.wasPressedThisFrame;
 
         public bool NextLevelPressed

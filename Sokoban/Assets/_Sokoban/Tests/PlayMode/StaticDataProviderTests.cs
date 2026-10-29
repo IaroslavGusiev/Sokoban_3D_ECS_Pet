@@ -50,6 +50,7 @@ namespace Sokoban.Tests.PlayMode
                 Assert.That(service.ReleaseCalls, Is.Zero);
                 Assert.That(provider.GetGameplaySettings(), Is.SameAs(configs[0]));
                 Assert.That(provider.GetViewCatalog(), Is.SameAs(configs[2]));
+                Assert.That(provider.GetBackgroundCatalog(), Is.SameAs(configs[3]));
                 Assert.That(provider.LevelCount, Is.EqualTo(1));
                 Assert.That(provider.GetLevelConfig(0).Address, Is.EqualTo("levels/test"));
             }
@@ -149,9 +150,11 @@ namespace Sokoban.Tests.PlayMode
         [TestCase(0, false)]
         [TestCase(1, false)]
         [TestCase(2, false)]
+        [TestCase(3, false)]
         [TestCase(0, true)]
         [TestCase(1, true)]
         [TestCase(2, true)]
+        [TestCase(3, true)]
         public void MissingOrDuplicateConfig_ReleasesBatchAndAllowsRetry(int index, bool duplicate)
         {
             IList<ScriptableObject> invalid = Configs();
@@ -190,9 +193,10 @@ namespace Sokoban.Tests.PlayMode
             var settings = ScriptableObject.CreateInstance<GameplaySettings>();
             var levels = ScriptableObject.CreateInstance<LevelList>();
             var views = ScriptableObject.CreateInstance<ViewCatalog>();
+            var backgrounds = ScriptableObject.CreateInstance<BackgroundCatalog>();
             JsonUtility.FromJsonOverwrite("{\"<Levels>k__BackingField\":[{\"address\":\"levels/test\"}]}", levels);
-            _assets.AddRange(new ScriptableObject[] { settings, levels, views });
-            return new List<ScriptableObject> { settings, levels, views };
+            _assets.AddRange(new ScriptableObject[] { settings, levels, views, backgrounds });
+            return new List<ScriptableObject> { settings, levels, views, backgrounds };
         }
     }
 }

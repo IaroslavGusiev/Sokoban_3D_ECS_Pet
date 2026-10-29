@@ -3,6 +3,8 @@
     "rootNamespace": "Sokoban.Tests.PlayMode",
     "references": [
         "Sokoban.Unity",
+        "Unity.RenderPipelines.Core.Runtime",
+        "Unity.RenderPipelines.HighDefinition.Runtime",
         "PrimeTween.Runtime",
         "Sokoban.Core",
         "Unity.InputSystem",

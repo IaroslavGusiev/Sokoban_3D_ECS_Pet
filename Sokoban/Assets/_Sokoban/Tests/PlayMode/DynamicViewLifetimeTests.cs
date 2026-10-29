@@ -301,6 +301,89 @@ namespace Sokoban.Tests.PlayMode
 
 #if UNITY_EDITOR
         [UnityTest]
+        public IEnumerator DelayedBoxBindingReflectsCurrentGoalOccupancy() => DelayedBoxOccupancy(false);
+
+        [UnityTest]
+        public IEnumerator DelayedBoxBindingDoesNotKeepOccupancyFromBeforeTheLoad() => DelayedBoxOccupancy(true);
+
+        private IEnumerator DelayedBoxOccupancy(bool leaveBeforeBinding)
+        {
+            var provider = new Provider { Immediate = CreatePrefab() };
+            Fixture f = Create(provider);
+            Entity goal = Floor(f.World, 2, 3);
+            goal.Set<GoalTag>();
+            f.Layer.Tick(0f);
+            provider.Immediate = null;
+            Entity box = Floor(f.World, 2, 3);
+            box.Set<BoxTag>();
+            f.Layer.Tick(0f);
+            int request = provider.Calls.Count - 1;
+            Assert.That(box.Has<ViewPending>(), Is.True);
+
+            if (leaveBeforeBinding)
+            {
+                box.Set(new GridPosition(3, 3));
+                f.Layer.Tick(0.16f);
+            }
+
+            GameObject prefab = UnityEditor.AssetDatabase.LoadAssetAtPath<GameObject>("Assets/AddressablesDependencies/Box/Prefabs/Box.prefab");
+            provider.Complete(request, prefab);
+            yield return null;
+            Assert.That(box.Has<TransformComponent>(), Is.False, "Completion is applied only by the presentation tick.");
+            f.Layer.Tick(0f);
+            var animator = View(box).GetComponent<BoxGoalAnimator>();
+            GameObject marker = animator.transform.Find("Visual/OccupiedGoalMarker").gameObject;
+            Assert.That(marker.activeSelf, Is.EqualTo(leaveBeforeBinding == false));
+            Assert.That(animator.IsPlaying, Is.False, "Binding alone must not invent an arrival.");
+        }
+
+        [UnityTest]
+        public IEnumerator OccupiedBoxReplacementAndRemovalSynchronizeAndCleanTheNewView()
+        {
+            GameObject prefab = UnityEditor.AssetDatabase.LoadAssetAtPath<GameObject>("Assets/AddressablesDependencies/Box/Prefabs/Box.prefab");
+            var provider = new Provider { Immediate = prefab };
+            Fixture f = Create(provider);
+            Entity goal = Floor(f.World, 2, 3);
+            goal.Set<GoalTag>();
+            Entity box = Floor(f.World, 2, 3);
+            box.Set<BoxTag>();
+            f.Layer.Tick(0f);
+            var old = View(box).GetComponent<BoxGoalAnimator>();
+            GameObject oldMarker = old.transform.Find("Visual/OccupiedGoalMarker").gameObject;
+            Assert.That(oldMarker.activeSelf, Is.True);
+            old.PlayGoalFeedback();
+            old.Tick(0.055f);
+
+            box.Set(new SkinChangeRequest(SkinId.Alternate));
+            f.Layer.Tick(0f);
+            var current = View(box).GetComponent<BoxGoalAnimator>();
+            GameObject marker = current.transform.Find("Visual/OccupiedGoalMarker").gameObject;
+            Assert.That(current, Is.Not.SameAs(old));
+            Assert.That(oldMarker.activeSelf, Is.False);
+            Assert.That(old.IsPlaying, Is.False);
+            Assert.That(marker.activeSelf, Is.True);
+            Assert.That(current.IsPlaying, Is.False);
+
+            current.PlayGoalFeedback();
+            current.Tick(0.055f);
+            Transform visual = current.transform.Find("Visual");
+            Vector3 position = prefab.transform.Find("Visual").localPosition;
+            Vector3 scale = prefab.transform.Find("Visual").localScale;
+            box.Dispose();
+            f.Layer.Tick(0f);
+            Assert.That(marker.activeSelf, Is.False);
+            Assert.That(current.IsPlaying, Is.False);
+            Assert.That(Tween.GetTweensCount(visual), Is.Zero);
+            Assert.That(visual.localPosition, Is.EqualTo(position));
+            Assert.That(visual.localScale, Is.EqualTo(scale));
+            f.Layer.Dispose();
+            _layers.Remove(f.Layer);
+            yield return null;
+            Assert.That(f.Parent.childCount, Is.Zero);
+            LogAssert.NoUnexpectedReceived();
+        }
+
+        [UnityTest]
         public IEnumerator RemovingAViewWithActiveFeedbackStopsAndRestoresTheVisual()
         {
             GameObject prefab = UnityEditor.AssetDatabase.LoadAssetAtPath<GameObject>("Assets/AddressablesDependencies/Box/Prefabs/Box.prefab");

@@ -1,0 +1,10 @@
+<ui:UXML xmlns:ui="UnityEngine.UIElements">
+    <ui:Button name="characterChoice" class="action character-choice">
+        <ui:Image name="characterPortrait" class="character-portrait" picking-mode="Ignore" />
+        <ui:Label name="characterName" class="character-name" picking-mode="Ignore" />
+        <ui:VisualElement class="selection-indicator" picking-mode="Ignore">
+            <ui:VisualElement class="selection-check" picking-mode="Ignore" />
+            <ui:Label text="Selected" picking-mode="Ignore" />
+        </ui:VisualElement>
+    </ui:Button>
+</ui:UXML>

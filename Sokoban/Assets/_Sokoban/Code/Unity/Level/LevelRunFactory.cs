@@ -10,14 +10,18 @@ namespace Sokoban.Presentation
         private readonly SimulationPipelineFactory _simulationPipelineFactory;
         private readonly ViewPipelineFactory _viewPipelineFactory;
 
-        public LevelRunFactory(LevelRoot root, IViewProvider provider, LevelPopulator populator,
-            SimulationPipelineFactory simulationPipelineFactory, ViewPipelineFactory viewPipelineFactory)
+        public LevelRunFactory(
+            LevelRoot root, 
+            IViewProvider provider, 
+            LevelPopulator populator,
+            SimulationPipelineFactory simulationPipelineFactory, 
+            ViewPipelineFactory viewPipelineFactory)
         {
             _root = root;
             _provider = provider;
             _populator = populator;
-            _simulationPipelineFactory = simulationPipelineFactory;
             _viewPipelineFactory = viewPipelineFactory;
+            _simulationPipelineFactory = simulationPipelineFactory;
         }
 
         public LevelRun Create(LevelDefinition level, RunOptions options) =>

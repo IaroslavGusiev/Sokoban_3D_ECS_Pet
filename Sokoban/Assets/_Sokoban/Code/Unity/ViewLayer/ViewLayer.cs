@@ -22,6 +22,54 @@ namespace Sokoban.Presentation
         
         private HintArrow _hintArrow;
 
+        public bool HasBoardFailure
+        {
+            get
+            {
+                foreach (Entity entity in _failedViews.GetEntities())
+                {
+                    if (entity.Has<PlayerTag>() == false)
+                    {
+                        return true;
+                    }
+                }
+
+                return false;
+            }
+        }
+
+        public bool HasPlayerFailure
+        {
+            get
+            {
+                foreach (Entity player in _players.GetEntities())
+                {
+                    if (player.Has<ViewFailed>())
+                    {
+                        return true;
+                    }
+                }
+
+                return false;
+            }
+        }
+
+        public bool IsPlayerDeferred
+        {
+            get
+            {
+                foreach (Entity player in _players.GetEntities())
+                {
+                    if (player.Has<PlayerViewDeferred>())
+                    {
+                        return true;
+                    }
+                }
+
+                return false;
+            }
+        }
+
         public bool IsMoving => _movingViews.Count > 0;
 
         public bool HasHintArrow => _hintArrow != null;
@@ -43,6 +91,7 @@ namespace Sokoban.Presentation
                 _missingViews = ViewQuery
                     .Viewable(world)
                     .Without<TransformComponent>()
+                    .Without<PlayerViewDeferred>()
                     .AsSet();
                 
                 _failedViews = world
@@ -60,6 +109,10 @@ namespace Sokoban.Presentation
                 foreach (Entity player in _players.GetEntities())
                 {
                     player.Set(new ViewSkin(options.Skin));
+                    if (options.DeferPlayerView)
+                    {
+                        player.Set<PlayerViewDeferred>();
+                    }
                 }
                 
                 var context = new ViewContext(_root, provider, _cancellation.Token, options.MoveDurationSeconds);
@@ -69,11 +122,13 @@ namespace Sokoban.Presentation
             {
                 _cancellation.Cancel();
                 DestroyRoot();
+                
                 _players?.Dispose();
                 _movingViews?.Dispose();
                 _failedViews?.Dispose();
                 _missingViews?.Dispose();
                 _cancellation.Dispose();
+                
                 throw;
             }
         }
@@ -86,6 +141,7 @@ namespace Sokoban.Presentation
             foreach (Entity player in _players.GetEntities())
             {
                 player.Set(new SkinChangeRequest(skin));
+                player.Remove<PlayerViewDeferred>();
             }
         }
 

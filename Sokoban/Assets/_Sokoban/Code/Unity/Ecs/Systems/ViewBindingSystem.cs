@@ -28,6 +28,7 @@ namespace Sokoban.Presentation.Ecs.Systems
             _world = world;
             _context = context;
             _candidates = ViewQuery.Viewable(world)
+                .Without<PlayerViewDeferred>()
                 .Without<ViewPending>()
                 .Without<ViewFailed>()
                 .Without<TransformComponent>()

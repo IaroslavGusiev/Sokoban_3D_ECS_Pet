@@ -7,7 +7,7 @@ namespace Sokoban.Presentation
         MoveCommand ReadMove();
         bool RestartPressed { get; }
         bool NextLevelPressed { get; }
-        bool NextSkinPressed { get; }
+        bool IsNeutral { get; }
         bool UndoPressed { get; }
     }
 }

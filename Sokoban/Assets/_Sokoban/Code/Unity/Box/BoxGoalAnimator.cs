@@ -7,6 +7,7 @@ namespace Sokoban.Presentation
     public sealed class BoxGoalAnimator : MonoBehaviour
     {
         [SerializeField] private Transform visual;
+        [SerializeField] private GameObject occupiedMarker;
         [SerializeField] private float durationSeconds = 0.22f;
         [SerializeField] private float height = 0.12f;
         [SerializeField] private float squashAmount = 0.12f;
@@ -23,13 +24,21 @@ namespace Sokoban.Presentation
             CapturePose();
 
         private void OnDisable() => 
-            StopAndRestore();
+            ClearFeedback();
 
         private void OnDestroy() => 
-            StopAndRestore();
+            ClearFeedback();
 
         private void Reset() => 
             visual = transform.Find("Visual");
+
+        public void SetOccupied(bool occupied)
+        {
+            if (occupiedMarker != null && occupiedMarker.activeSelf != occupied)
+            {
+                occupiedMarker.SetActive(occupied);
+            }
+        }
 
         public void PlayGoalFeedback()
         {
@@ -81,6 +90,12 @@ namespace Sokoban.Presentation
             _feedback.Stop();
             _feedback = default;
             RestorePose();
+        }
+
+        private void ClearFeedback()
+        {
+            StopAndRestore();
+            SetOccupied(false);
         }
 
         private void CapturePose()

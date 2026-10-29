@@ -8,6 +8,7 @@ namespace Sokoban.Tests.PlayMode
     {
         public GameplaySettings Gameplay;
         public ViewCatalog Views;
+        public BackgroundCatalog Backgrounds;
         public LevelConfig[] Levels = { new("levels/level-01"), new("levels/level-02") };
         public UniTaskCompletionSource Pending;
         public int LoadCalls;
@@ -21,6 +22,7 @@ namespace Sokoban.Tests.PlayMode
         }
 
         public GameplaySettings GetGameplaySettings() => Gameplay;
+        public BackgroundCatalog GetBackgroundCatalog() => Backgrounds;
         public ViewCatalog GetViewCatalog() => Views;
         public LevelConfig GetLevelConfig(int levelIndex) => Levels[levelIndex];
 

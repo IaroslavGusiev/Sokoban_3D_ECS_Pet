@@ -3,10 +3,13 @@ using System.Collections;
 using System.Collections.Generic;
 using System.Threading;
 using Cysharp.Threading.Tasks;
+using DefaultEcs;
 using NUnit.Framework;
 using Sokoban.Core;
+using Sokoban.Core.Components;
 using Sokoban.Presentation;
 using Sokoban.Presentation.Ecs.Model;
+using Sokoban.Presentation.Ecs.Components;
 using UnityEngine;
 using UnityEngine.AddressableAssets;
 using UnityEngine.ResourceManagement.AsyncOperations;
@@ -127,12 +130,84 @@ namespace Sokoban.Tests.PlayMode
             try
             {
                 IList<ScriptableObject> loaded = await _service.AwaitAsync(configs, CancellationToken.None);
-                Assert.That(loaded.Count, Is.EqualTo(3));
+                Assert.That(loaded.Count, Is.EqualTo(4));
                 Assert.That(loaded, Has.Exactly(1).InstanceOf<GameplaySettings>());
                 Assert.That(loaded, Has.Exactly(1).InstanceOf<LevelList>());
                 Assert.That(loaded, Has.Exactly(1).InstanceOf<ViewCatalog>());
+                Assert.That(loaded, Has.Exactly(1).InstanceOf<BackgroundCatalog>());
             }
             finally { _service.Release(configs); }
+        });
+
+        [UnityTest]
+        public IEnumerator BackgroundCatalog_LoadsEveryCubemapFromBuiltContent() => UniTask.ToCoroutine(async () =>
+        {
+            using var data = new StaticDataProvider(_service);
+            await data.LoadAsync(CancellationToken.None);
+            BackgroundCatalog catalog = data.GetBackgroundCatalog();
+            Assert.That(catalog.Presets.Count, Is.EqualTo(10));
+            foreach (BackgroundPreset preset in catalog.Presets)
+            {
+                var handle = _service.Load<Cubemap>(preset.Address);
+                try
+                {
+                    Cubemap cubemap = await _service.AwaitAsync(handle, CancellationToken.None);
+                    Assert.That(cubemap, Is.Not.Null, preset.Name);
+                    Assert.That(cubemap.mipmapCount, Is.GreaterThan(1), preset.Name);
+                }
+                finally
+                {
+                    _service.Release(handle);
+                }
+            }
+        });
+
+        [UnityTest]
+        public IEnumerator GoalViewsFromBuiltContentKeepOccupancyPerInstance() => UniTask.ToCoroutine(async () =>
+        {
+            using var data = new StaticDataProvider(_service);
+            await data.LoadAsync(CancellationToken.None);
+            using var views = new ViewAssets(data, _service);
+            using var world = new World();
+            Entity goal = world.CreateEntity();
+            goal.Set<FloorTag>();
+            goal.Set<GoalTag>();
+            goal.Set(new GridPosition(1, 1));
+            Entity occupied = world.CreateEntity();
+            occupied.Set<BoxTag>();
+            occupied.Set(new GridPosition(1, 1));
+            Entity empty = world.CreateEntity();
+            empty.Set<BoxTag>();
+            empty.Set(new GridPosition(2, 1));
+            var root = new GameObject("Built goal views");
+            _assets.Add(root);
+            using var layer = new ViewLayer(new LevelRoot(root.transform), world, views, new ViewPipelineFactory(),
+                new RunOptions(SkinId.Default, 60f, 0.16f));
+            for (int frame = 0; frame < 300 && layer.Status == ViewStatus.Binding; frame++)
+            {
+                layer.Tick(0f);
+                await UniTask.NextFrame();
+            }
+
+            Assert.That(layer.Status, Is.EqualTo(ViewStatus.Ready));
+            var first = occupied.Get<BoxGoalFeedbackComponent>().Animator;
+            var second = empty.Get<BoxGoalFeedbackComponent>().Animator;
+            Transform firstMarker = first.transform.Find("Visual/OccupiedGoalMarker");
+            Transform secondMarker = second.transform.Find("Visual/OccupiedGoalMarker");
+            Assert.That(firstMarker.gameObject.activeSelf, Is.True);
+            Assert.That(secondMarker.gameObject.activeSelf, Is.False);
+            Assert.That(firstMarker.GetComponent<MeshFilter>().sharedMesh, Is.Not.Null);
+            Material shared = firstMarker.GetComponent<MeshRenderer>().sharedMaterial;
+            Assert.That(shared.shader.isSupported, Is.True);
+            Assert.That(secondMarker.GetComponent<MeshRenderer>().sharedMaterial, Is.SameAs(shared));
+
+            occupied.Set(new GridPosition(3, 1));
+            empty.Set(new GridPosition(1, 1));
+            layer.Tick(0.16f);
+            Assert.That(firstMarker.gameObject.activeSelf, Is.False);
+            Assert.That(secondMarker.gameObject.activeSelf, Is.True);
+            Assert.That(first.IsPlaying || second.IsPlaying, Is.False);
+            Assert.That(firstMarker.GetComponent<MeshRenderer>().sharedMaterial, Is.SameAs(shared));
         });
 
         [UnityTest]

@@ -13,6 +13,12 @@ namespace Sokoban.Presentation
 
         private MoveCommand _bufferedMove;
 
+        public bool HasBoardFailure => _viewLayer.HasBoardFailure;
+
+        public bool HasPlayerFailure => _viewLayer.HasPlayerFailure;
+
+        public bool IsPlayerDeferred => _viewLayer.IsPlayerDeferred;
+
         public ViewStatus ViewStatus => _viewLayer.Status;
         
         public bool IsCompleted => _simulation.IsCompleted;
@@ -23,10 +29,12 @@ namespace Sokoban.Presentation
         
         public LevelResult Result => _simulation.Result;
 
-        public bool CanUndo => ViewStatus == ViewStatus.Ready && _viewLayer.IsMoving == false && _simulation.CanUndo;
+        public bool CanUndo => ViewStatus == ViewStatus.Ready && IsPlayerDeferred == false && _viewLayer.IsMoving == false && _simulation.CanUndo;
 
-        public bool CanHint => ViewStatus == ViewStatus.Ready && _viewLayer.IsMoving == false && IsCompleted == false && IsTimedOut == false;
+        public bool CanHint => ViewStatus == ViewStatus.Ready && IsPlayerDeferred == false && _viewLayer.IsMoving == false && IsCompleted == false && IsTimedOut == false;
+        
         public long BoardRevision => _simulation.BoardRevision;
+        
         public bool HasHintArrow => _viewLayer.HasHintArrow;
 
         public LevelRun(LevelRoot root, LevelDefinition level, IViewProvider provider, LevelPopulator populator,

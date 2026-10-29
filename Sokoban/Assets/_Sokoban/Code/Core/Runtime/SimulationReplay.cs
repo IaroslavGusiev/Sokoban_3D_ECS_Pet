@@ -6,6 +6,7 @@ namespace Sokoban.Core
     {
         private readonly SimulationRecording _recording;
         private Simulation _simulation;
+        
         private int _nextInput;
 
         public Simulation Simulation => _simulation ?? throw new ObjectDisposedException(nameof(SimulationReplay));

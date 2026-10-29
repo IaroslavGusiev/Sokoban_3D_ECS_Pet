@@ -8,6 +8,9 @@ namespace Sokoban.Presentation
         Completed,
         ViewsFailed,
         LevelFailed,
-        Finished
+        Finished,
+        SelectingCharacter,
+        BindingCharacter,
+        CharacterFailed
     }
 }

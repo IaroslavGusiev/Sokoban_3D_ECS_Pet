@@ -1,7 +1,7 @@
 using System;
 using System.Linq;
-using System.Collections.Generic;
 using Sokoban.Core.Components;
+using System.Collections.Generic;
 
 namespace Sokoban.Core
 {
@@ -10,12 +10,13 @@ namespace Sokoban.Core
         public GridPosition PlayerPosition { get; }
         public IReadOnlyList<GridPosition> BoxPositions { get; }
         public int Moves { get; }
-        public float RemainingSeconds { get; }
-        public float ElapsedSeconds { get; }
-        public bool IsCompleted { get; }
-        public bool IsTimedOut { get; }
-        public bool CanUndo { get; }
         public long BoardRevision { get; }
+        public float RemainingSeconds { get; }
+
+        private float ElapsedSeconds { get; }
+        private bool IsCompleted { get; }
+        private bool IsTimedOut { get; }
+        private bool CanUndo { get; }
 
         internal GameplaySnapshot(GridPosition playerPosition, IEnumerable<GridPosition> boxes, LevelResult result,
             bool isCompleted, bool isTimedOut, bool canUndo, long boardRevision)
@@ -51,7 +52,12 @@ namespace Sokoban.Core
             unchecked
             {
                 int hash = PlayerPosition.GetHashCode();
-                foreach (GridPosition box in BoxPositions) hash = (hash * 397) ^ box.GetHashCode();
+                
+                foreach (GridPosition box in BoxPositions)
+                {
+                    hash = (hash * 397) ^ box.GetHashCode();
+                }
+                
                 hash = (hash * 397) ^ Moves;
                 hash = (hash * 397) ^ RemainingSeconds.GetHashCode();
                 hash = (hash * 397) ^ ElapsedSeconds.GetHashCode();

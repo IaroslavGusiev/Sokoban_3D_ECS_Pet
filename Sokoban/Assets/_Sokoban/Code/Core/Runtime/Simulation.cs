@@ -43,6 +43,7 @@ namespace Sokoban.Core
             }
 
             _timeLimitSeconds = timeLimitSeconds;
+            
             _initialLevel = level;
             
             _inputs = recordInputs 
@@ -56,12 +57,8 @@ namespace Sokoban.Core
                 _player = populator.Populate(World, level);
                 
                 _levelState = World.CreateEntity();
-                _levelState.Set<LevelStateTag>();
-                _levelState.Set(new LevelTimer(timeLimitSeconds));
-                _levelState.Set(new MoveCount(0));
-                _levelState.Set(new BoardRevision(0));
-                _levelState.Set(_history);
-                
+                InitializeLevelState(timeLimitSeconds);
+
                 _pipeline = createPipeline(World);
             }
             catch
@@ -110,7 +107,7 @@ namespace Sokoban.Core
             _levelState.Set<UndoRequest>();
             return true;
         }
-        
+
         public void Tick(float deltaTime)
         {
             if (float.IsNaN(deltaTime) || float.IsInfinity(deltaTime) || deltaTime < 0f)
@@ -145,6 +142,15 @@ namespace Sokoban.Core
             return command is MoveCommand.Up or MoveCommand.Down or MoveCommand.Left or MoveCommand.Right
                    && _player.Has<MoveRequest>() == false && _levelState.Has<UndoRequest>() == false
                    && IsCompleted == false && IsTimedOut == false;
+        }
+
+        private void InitializeLevelState(float timeLimitSeconds)
+        {
+            _levelState.Set<LevelStateTag>();
+            _levelState.Set(new LevelTimer(timeLimitSeconds));
+            _levelState.Set(new MoveCount(0));
+            _levelState.Set(new BoardRevision(0));
+            _levelState.Set(_history);
         }
     }
 }

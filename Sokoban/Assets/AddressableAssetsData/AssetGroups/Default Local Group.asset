@@ -65,6 +65,12 @@ MonoBehaviour:
     m_ReadOnly: 0
     m_SerializedLabels: []
     FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: e770273fd4fbe4b4cb8bdb9978d4f06a
+    m_Address: configs/backgrounds
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - Configs
+    FlaggedDuringContentUpdateRestriction: 0
   - m_GUID: f7e9e05cd5b698447b3a83371f127eb7
     m_Address: views/goal
     m_ReadOnly: 0

@@ -1,6 +1,7 @@
 #if UNITY_EDITOR
 using System.Collections;
 using System.Collections.Generic;
+using System.Linq;
 using DefaultEcs;
 using DefaultEcs.System;
 using NUnit.Framework;
@@ -38,6 +39,112 @@ namespace Sokoban.Tests.PlayMode
             }
             _objects.Clear();
             yield return null;
+        }
+
+        [Test]
+        public void Occupancy_PersistsAfterArrivalAndClearsWhenTheBoxLeaves()
+        {
+            using var world = new World();
+            Entity box = Box(world);
+            Entity goal = world.CreateEntity();
+            goal.Set<GoalTag>();
+            goal.Set(box.Get<GridPosition>());
+            BoxGoalAnimator animator = Bind(box, out Transform visual);
+            GameObject marker = visual.Find("OccupiedGoalMarker").gameObject;
+            Vector3 position = visual.localPosition;
+            Vector3 scale = visual.localScale;
+            using var pipeline = Pipeline(world);
+
+            pipeline.Update(0f);
+            Assert.That(marker.activeSelf, Is.True, "Initial occupancy does not require an arrival event.");
+            Assert.That(animator.IsPlaying, Is.False);
+
+            world.Publish(new BoxEnteredGoal(box, box.Get<GridPosition>()));
+            pipeline.Update(0f);
+            pipeline.Update(0.055f);
+            Assert.That(animator.IsPlaying, Is.True);
+            Assert.That(marker.activeSelf, Is.True);
+            pipeline.Update(1f);
+            AssertRestored(animator, visual, position, scale);
+            Assert.That(box.Has<BoxGoalFeedbackState>(), Is.False);
+            Assert.That(marker.activeSelf, Is.True, "Tween completion must not clear occupancy.");
+
+            box.Set(new GridPosition(4, 1));
+            pipeline.Update(0f);
+            Assert.That(marker.activeSelf, Is.False);
+        }
+
+        [Test]
+        public void Occupancy_FollowsPushAndUndoInBothDirectionsWithoutReplayingArrival()
+        {
+            LevelDefinition level = LevelParser.Parse("########\n#@$.-$.#\n#------#\n########");
+            using var simulation = new Simulation(level, new LevelPopulator(), 60f, new SimulationPipelineFactory());
+            var provider = new Provider(CreateView(), CreateObject("Fallback"));
+            using var layer = new ViewLayer(new LevelRoot(CreateObject("View parent").transform), simulation.World,
+                provider, new ViewPipelineFactory(), new RunOptions(SkinId.Default, 60f, 0.16f));
+            int arrivals = 0;
+            using var subscription = simulation.World.Subscribe<BoxEnteredGoal>((in BoxEnteredGoal _) => { arrivals++; });
+            layer.Tick(0f);
+            Entity box = simulation.World.Single(e => e.Has<BoxTag>() && e.Get<GridPosition>().X == 2);
+            BoxGoalAnimator animator = box.Get<BoxGoalFeedbackComponent>().Animator;
+            GameObject marker = animator.transform.Find("Visual/OccupiedGoalMarker").gameObject;
+            Assert.That(marker.activeSelf, Is.False);
+
+            simulation.Send(MoveCommand.Right);
+            simulation.Tick(0.16f);
+            layer.Tick(0.16f);
+            layer.Tick(0.3f);
+            Assert.That(marker.activeSelf, Is.True);
+            Assert.That(animator.IsPlaying, Is.False);
+            Assert.That(arrivals, Is.EqualTo(1));
+
+            simulation.Send(MoveCommand.Right);
+            simulation.Tick(0.16f);
+            layer.Tick(0.16f);
+            Assert.That(marker.activeSelf, Is.False);
+
+            Assert.That(simulation.RequestUndo(), Is.True);
+            simulation.Tick(0.16f);
+            layer.Tick(0.16f);
+            Assert.That(marker.activeSelf, Is.True);
+            Assert.That(animator.IsPlaying, Is.False);
+            Assert.That(arrivals, Is.EqualTo(1));
+
+            Assert.That(simulation.RequestUndo(), Is.True);
+            simulation.Tick(0.16f);
+            layer.Tick(0.16f);
+            Assert.That(marker.activeSelf, Is.False);
+            Assert.That(animator.IsPlaying, Is.False);
+            Assert.That(arrivals, Is.EqualTo(1));
+        }
+
+        [Test]
+        public void Occupancy_DisabledCompositePausesSynchronizationAndDisposalClearsSettledMarkers()
+        {
+            using var world = new World();
+            Entity box = Box(world);
+            Entity goal = world.CreateEntity();
+            goal.Set<GoalTag>();
+            goal.Set(box.Get<GridPosition>());
+            BoxGoalAnimator animator = Bind(box, out Transform visual);
+            GameObject marker = visual.Find("OccupiedGoalMarker").gameObject;
+            var pipeline = Pipeline(world);
+            try
+            {
+                pipeline.IsEnabled = false;
+                pipeline.Update(0f);
+                Assert.That(marker.activeSelf, Is.False);
+                pipeline.IsEnabled = true;
+                pipeline.Update(0f);
+                Assert.That(marker.activeSelf, Is.True);
+                Assert.That(animator.IsPlaying, Is.False);
+            }
+            finally
+            {
+                pipeline.Dispose();
+            }
+
+            Assert.That(marker.activeSelf, Is.False);
         }
 
         [Test]
@@ -191,7 +298,9 @@ namespace Sokoban.Tests.PlayMode
             pipeline.Update(0f);
             pipeline.Update(0.05f);
             var adapter = animator.GetComponent<BoxGoalFeedbackAdapter>();
+            animator.SetOccupied(true);
             adapter.Uninstall(box);
+            Assert.That(visual.Find("OccupiedGoalMarker").gameObject.activeSelf, Is.False);
             Assert.That(box.Has<BoxGoalFeedbackComponent>() || box.Has<BoxGoalFeedbackState>(), Is.False);
             AssertRestored(animator, visual, baseline, scale);
             adapter.Uninstall(box);
@@ -297,8 +406,10 @@ namespace Sokoban.Tests.PlayMode
             Vector3 baseline = visual.localPosition;
             Vector3 scale = visual.localScale;
             animator.PlayGoalFeedback();
+            animator.SetOccupied(true);
             animator.Tick(0.05f);
             animator.gameObject.SetActive(false);
+            Assert.That(visual.Find("OccupiedGoalMarker").gameObject.activeSelf, Is.False);
             AssertRestored(animator, visual, baseline, scale);
             animator.gameObject.SetActive(true);
             animator.PlayGoalFeedback();
@@ -331,14 +442,17 @@ namespace Sokoban.Tests.PlayMode
             Vector3 scale = boxPrefab.transform.Find("Visual").localScale;
             Assert.That(animator.IsPlaying, Is.True);
             Assert.That(Tween.GetTweensCount(visual), Is.GreaterThan(0));
+            Assert.That(visual.Find("OccupiedGoalMarker").gameObject.activeSelf, Is.True);
             run.Dispose();
             AssertRestored(animator, visual, baseline, scale);
+            Assert.That(visual.Find("OccupiedGoalMarker").gameObject.activeSelf, Is.False);
             using var replacement = new LevelRun(new LevelRoot(parent.transform), level, provider, new LevelPopulator(),
                 simulationPipelineFactory, viewPipelineFactory, options);
             replacement.TickView(0.1f);
             var nextAnimator = parent.GetComponentInChildren<BoxGoalAnimator>();
             Assert.That(nextAnimator, Is.Not.SameAs(animator));
             Assert.That(nextAnimator.IsPlaying, Is.False);
+            Assert.That(nextAnimator.transform.Find("Visual/OccupiedGoalMarker").gameObject.activeSelf, Is.False);
             for (int frame = 0; frame < 3; frame++) yield return null;
             Assert.That(nextAnimator.IsPlaying, Is.False);
         }
@@ -355,22 +469,27 @@ namespace Sokoban.Tests.PlayMode
             var input = new Input();
             var source = new HoldingSource();
             GameplaySettings settings = TestGameplaySettings.Create(completionDelay: 10f);
+            var catalog = ScriptableObject.CreateInstance<BackgroundCatalog>();
+            var characterAssets = new List<UnityEngine.Object>();
             try
             {
                 var factory = new LevelRunFactory(new LevelRoot(parent.transform), provider, new LevelPopulator(), new SimulationPipelineFactory(), new ViewPipelineFactory());
+                var data = new TestStaticData { Gameplay = settings };
+                TestCharacterSelection.Configure(data, characterAssets);
+                var backgrounds = TestBackgrounds.Create(data, CreateObject("Background target"), catalog);
                 using var controller = new GameplayController(input, source, new HintCoordinator(new HintService(new HintSolver()), provider),
-                    factory, new TestStaticData { Gameplay = settings });
+                    backgrounds, factory, data);
                 controller.Initialize();
-                controller.Tick(0f);
+                TestCharacterSelection.Tick(controller, 0f);
                 input.Move = MoveCommand.Right;
-                controller.Tick(0.16f);
+                TestCharacterSelection.Tick(controller, 0.16f);
                 input.Move = default;
-                controller.Tick(0.05f);
+                TestCharacterSelection.Tick(controller, 0.05f);
                 var animator = parent.GetComponentInChildren<BoxGoalAnimator>();
                 Transform visual = animator.transform.Find("Visual");
                 Assert.That(animator.IsPlaying, Is.True);
                 input.NextLevelPressed = true;
-                controller.Tick(0f);
+                TestCharacterSelection.Tick(controller, 0f);
                 input.NextLevelPressed = false;
                 Assert.That(controller.Phase, Is.EqualTo(GameplayPhase.Loading));
                 Vector3 position = visual.localPosition;
@@ -378,7 +497,7 @@ namespace Sokoban.Tests.PlayMode
                 for (int frame = 0; frame < 4; frame++)
                 {
                     yield return null;
-                    controller.Tick(0.1f);
+                    TestCharacterSelection.Tick(controller, 0.1f);
                 }
                 Assert.That(visual.localPosition, Is.EqualTo(position));
                 Assert.That(visual.localScale, Is.EqualTo(scale));
@@ -393,6 +512,11 @@ namespace Sokoban.Tests.PlayMode
             finally
             {
                 Object.Destroy(settings);
+                Object.Destroy(catalog);
+                foreach (UnityEngine.Object asset in characterAssets)
+                {
+                    Object.Destroy(asset);
+                }
             }
         }
 
@@ -472,9 +596,13 @@ namespace Sokoban.Tests.PlayMode
             visual.SetParent(root.transform, false);
             visual.localPosition = new Vector3(-0.004f, 0.02f, 0.001f);
             visual.localScale = Vector3.one * 0.442f;
+            var marker = new GameObject("OccupiedGoalMarker");
+            marker.transform.SetParent(visual, false);
+            marker.SetActive(false);
             var animator = root.AddComponent<BoxGoalAnimator>();
             var animatorData = new SerializedObject(animator);
             animatorData.FindProperty("visual").objectReferenceValue = visual;
+            animatorData.FindProperty("occupiedMarker").objectReferenceValue = marker;
             animatorData.FindProperty("durationSeconds").floatValue = durationSeconds;
             animatorData.FindProperty("height").floatValue = height;
             animatorData.FindProperty("squashAmount").floatValue = squashAmount;
@@ -533,7 +661,7 @@ namespace Sokoban.Tests.PlayMode
             public MoveCommand Move;
             public bool RestartPressed => false;
             public bool NextLevelPressed { get; set; }
-            public bool NextSkinPressed => false;
+            public bool IsNeutral => true;
             public MoveCommand ReadMove() => Move;
         }
     }

@@ -7,13 +7,28 @@ namespace Sokoban.Presentation.Ecs.Systems
 {
     public sealed class BoxGoalFeedbackLifecycleSystem : AEntitySetSystem<float>
     {
+        private readonly EntitySet _goals;
+
         public BoxGoalFeedbackLifecycleSystem(World world)
             : base(world.GetEntities()
                 .With<BoxTag>()
                 .With<GridPosition>()
                 .With<BoxGoalFeedbackComponent>()
-                .With<BoxGoalFeedbackState>()
-                .AsSet(), useBuffer: true) { }
+                .AsSet(), useBuffer: true)
+        {
+            try
+            {
+                _goals = world.GetEntities()
+                    .With<GoalTag>()
+                    .With<GridPosition>()
+                    .AsSet();
+            }
+            catch
+            {
+                base.Dispose();
+                throw;
+            }
+        }
 
         protected override void Update(float deltaTime, in Entity entity)
         {
@@ -21,6 +36,15 @@ namespace Sokoban.Presentation.Ecs.Systems
             if (animator == null)
             {
                 entity.Remove<BoxGoalFeedbackState>();
+                return;
+            }
+
+            // Occupancy is projected from Core positions, independently of arrival messages
+            // and tween lifetime. This also covers undo and a newly installed/replaced view.
+            animator.SetOccupied(IsGoal(entity.Get<GridPosition>()));
+
+            if (entity.Has<BoxGoalFeedbackState>() == false)
+            {
                 return;
             }
 
@@ -49,14 +73,29 @@ namespace Sokoban.Presentation.Ecs.Systems
                     if (animator != null)
                     {
                         animator.StopAndRestore();
+                        animator.SetOccupied(false);
                     }
                     entity.Remove<BoxGoalFeedbackState>();
                 }
             }
             finally
             {
+                _goals.Dispose();
                 base.Dispose();
             }
+        }
+
+        private bool IsGoal(GridPosition position)
+        {
+            foreach (Entity goal in _goals.GetEntities())
+            {
+                if (goal.Get<GridPosition>() == position)
+                {
+                    return true;
+                }
+            }
+
+            return false;
         }
     }
 }

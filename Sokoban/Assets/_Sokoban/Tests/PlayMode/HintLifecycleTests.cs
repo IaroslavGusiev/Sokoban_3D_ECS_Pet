@@ -41,18 +41,18 @@ namespace Sokoban.Tests.PlayMode
             Start(f);
             Assert.That(f.Controller.CanHint, Is.False);
             f.Controller.RequestHint();
-            f.Controller.Tick(1f);
+            TestCharacterSelection.Tick(f.Controller, 1f);
             Assert.That(f.Controller.RemainingSeconds, Is.EqualTo(59f));
             Assert.That(f.Service.Calls.Count, Is.EqualTo(1));
             f.Input.Move = MoveCommand.Right;
-            f.Controller.Tick(0.16f);
+            TestCharacterSelection.Tick(f.Controller, 0.16f);
             f.Input.Move = default;
             Assert.That(f.Controller.Moves, Is.EqualTo(1));
             Assert.That(SimulationOf(f).BoardRevision, Is.EqualTo(1));
             Assert.That(f.Service.Calls[0].Token.IsCancellationRequested, Is.True);
             f.Service.Calls[0].Source.SetResult(new HintResult(HintOutcome.Found, MoveCommand.Up));
             yield return null;
-            f.Controller.Tick(0f);
+            TestCharacterSelection.Tick(f.Controller, 0f);
             Assert.That(f.Controller.HintStatus, Is.EqualTo(HintStatus.None));
             Assert.That(ActiveArrows(f), Is.Zero);
         }
@@ -64,12 +64,12 @@ namespace Sokoban.Tests.PlayMode
             Move(f, MoveCommand.Right);
             Start(f);
             f.Controller.RequestUndo();
-            f.Controller.Tick(0.16f);
+            TestCharacterSelection.Tick(f.Controller, 0.16f);
             Assert.That(f.Controller.Moves, Is.Zero);
             Assert.That(SimulationOf(f).BoardRevision, Is.EqualTo(2));
             f.Service.Calls[0].Source.SetResult(new HintResult(HintOutcome.Found, MoveCommand.Up));
             yield return null;
-            f.Controller.Tick(0f);
+            TestCharacterSelection.Tick(f.Controller, 0f);
             Assert.That(f.Controller.HintStatus, Is.EqualTo(HintStatus.None));
             Assert.That(f.Service.Calls[0].Token.IsCancellationRequested, Is.True);
             Assert.That(ActiveArrows(f), Is.Zero);
@@ -88,7 +88,7 @@ namespace Sokoban.Tests.PlayMode
             LevelDefinition oldBoard = f.Service.Calls[0].Board;
             Move(f, MoveCommand.Right);
             f.Controller.RequestUndo();
-            f.Controller.Tick(0.16f);
+            TestCharacterSelection.Tick(f.Controller, 0.16f);
             Assert.That(SimulationOf(f).CaptureSnapshot().PlayerPosition, Is.EqualTo(oldBoard.PlayerStart));
             Assert.That(SimulationOf(f).BoardRevision, Is.EqualTo(2));
             Start(f);
@@ -96,7 +96,7 @@ namespace Sokoban.Tests.PlayMode
             if (failure) f.Service.Calls[0].Source.SetException(new InvalidOperationException("old hint failure"));
             else f.Service.Calls[0].Source.SetResult(new HintResult(HintOutcome.Found, MoveCommand.Up));
             yield return null;
-            f.Controller.Tick(0f);
+            TestCharacterSelection.Tick(f.Controller, 0f);
             Assert.That(f.Controller.HintStatus, Is.EqualTo(HintStatus.Calculating));
             Assert.That(ActiveArrows(f), Is.Zero);
             f.Service.Calls[1].Source.SetResult(new HintResult(HintOutcome.Found, MoveCommand.Right));
@@ -115,14 +115,14 @@ namespace Sokoban.Tests.PlayMode
             int disposals = 0;
             using var subscription = previous.World.SubscribeWorldDisposed(_ => disposals++);
             f.Controller.RequestRestart();
-            f.Controller.Tick(0f);
+            TestCharacterSelection.Tick(f.Controller, 0f);
             Assert.That(disposals, Is.EqualTo(1));
             Assert.That(previousRoot.gameObject.activeSelf, Is.False);
-            f.Controller.Tick(0f);
+            TestCharacterSelection.Tick(f.Controller, 0f);
             Start(f);
             f.Service.Calls[0].Source.SetResult(new HintResult(HintOutcome.Found, MoveCommand.Up));
             yield return null;
-            f.Controller.Tick(0f);
+            TestCharacterSelection.Tick(f.Controller, 0f);
             Assert.That(previousRoot == null, Is.True);
             Assert.That(f.Controller.HintStatus, Is.EqualTo(HintStatus.Calculating));
             f.Service.Calls[1].Source.SetResult(new HintResult(HintOutcome.Found, MoveCommand.Right));
@@ -141,7 +141,7 @@ namespace Sokoban.Tests.PlayMode
             Assert.That(f.Controller.Phase, Is.EqualTo(GameplayPhase.Completed));
             f.Service.Calls[0].Source.SetResult(new HintResult(HintOutcome.Found, MoveCommand.Right));
             yield return null;
-            f.Controller.Tick(0f);
+            TestCharacterSelection.Tick(f.Controller, 0f);
             Assert.That(f.Controller.HintStatus, Is.EqualTo(HintStatus.None));
             Assert.That(f.Controller.CanHint, Is.False);
             Assert.That(ActiveArrows(f), Is.Zero);
@@ -152,10 +152,10 @@ namespace Sokoban.Tests.PlayMode
         {
             Fixture f = Create(limit: 1f);
             Start(f);
-            f.Controller.Tick(1f);
+            TestCharacterSelection.Tick(f.Controller, 1f);
             f.Service.Calls[0].Source.SetException(new InvalidOperationException("late timeout failure"));
             yield return null;
-            f.Controller.Tick(0f);
+            TestCharacterSelection.Tick(f.Controller, 0f);
             Assert.That(f.Controller.Phase, Is.EqualTo(GameplayPhase.Playing));
             Assert.That(f.Controller.HintStatus, Is.EqualTo(HintStatus.None));
             Assert.That(f.Controller.RemainingSeconds, Is.EqualTo(1f));
@@ -226,11 +226,11 @@ namespace Sokoban.Tests.PlayMode
             Assert.That(Vector3.Distance(arrow.transform.forward, Vector3.right), Is.LessThan(0.00001f));
             Assert.That(arrow.transform.position, Is.EqualTo(new Vector3(1.55f, 1.8f, 1f)));
             Move(f, MoveCommand.Left);
-            f.Controller.Tick(0.25f);
+            TestCharacterSelection.Tick(f.Controller, 0.25f);
             Assert.That(f.Controller.HintStatus, Is.EqualTo(HintStatus.Available));
             Assert.That(SimulationOf(f).BoardRevision, Is.Zero);
             f.Controller.RequestNextSkin();
-            f.Controller.Tick(0f);
+            TestCharacterSelection.Tick(f.Controller, 0f);
             Assert.That(SimulationOf(f).BoardRevision, Is.Zero);
             Move(f, MoveCommand.Right);
             Assert.That(arrow.gameObject.activeSelf, Is.False);
@@ -248,22 +248,22 @@ namespace Sokoban.Tests.PlayMode
         {
             Fixture f = Create();
             f.Input.Move = MoveCommand.Right;
-            f.Controller.Tick(0.04f);
+            TestCharacterSelection.Tick(f.Controller, 0.04f);
             f.Input.Move = default;
             Assert.That(f.Controller.CanHint, Is.False);
             f.Controller.RequestHint();
-            f.Controller.Tick(0.12f);
-            f.Controller.Tick(0f);
+            TestCharacterSelection.Tick(f.Controller, 0.12f);
+            TestCharacterSelection.Tick(f.Controller, 0f);
             Assert.That(f.Service.Calls, Is.Empty);
             Assert.That(f.Controller.CanHint, Is.True);
             f.Provider.Pending = new UniTaskCompletionSource<GameObject>();
             f.Controller.RequestNextSkin();
-            f.Controller.Tick(0f);
+            TestCharacterSelection.Tick(f.Controller, 0f);
             Assert.That(f.Controller.CanHint, Is.False);
             f.Controller.RequestHint();
-            f.Controller.Tick(0f);
+            TestCharacterSelection.Tick(f.Controller, 0f);
             f.Provider.Pending.TrySetResult(f.Provider.Prefab);
-            f.Controller.Tick(0f);
+            TestCharacterSelection.Tick(f.Controller, 0f);
             Assert.That(f.Service.Calls, Is.Empty);
             Assert.That(f.Controller.CanHint, Is.True);
             Start(f);
@@ -277,12 +277,12 @@ namespace Sokoban.Tests.PlayMode
         {
             Fixture f = Create(service: new HintService(new HintSolver()));
             f.Controller.RequestHint();
-            f.Controller.Tick(0f);
+            TestCharacterSelection.Tick(f.Controller, 0f);
             float deadline = Time.realtimeSinceStartup + 10f;
             while (f.Controller.HintStatus == HintStatus.Calculating && Time.realtimeSinceStartup < deadline)
             {
                 yield return null;
-                f.Controller.Tick(0f);
+                TestCharacterSelection.Tick(f.Controller, 0f);
             }
             Assert.That(f.Controller.HintStatus, Is.EqualTo(HintStatus.Available));
             Assert.That(f.Controller.HintMove, Is.EqualTo(MoveCommand.Right));
@@ -302,7 +302,7 @@ namespace Sokoban.Tests.PlayMode
             for (int index = 0; index < 3; index++)
             {
                 f.Controller.RequestHint();
-                f.Controller.Tick(1f);
+                TestCharacterSelection.Tick(f.Controller, 1f);
             }
             Assert.That(f.Service.Calls.Count, Is.EqualTo(1));
             Assert.That(f.Provider.ArrowLoads.Count, Is.EqualTo(1));
@@ -325,7 +325,7 @@ namespace Sokoban.Tests.PlayMode
             Assert.That(f.Provider.ArrowLoads[0].Token.IsCancellationRequested, Is.True);
             f.Provider.ArrowLoads[0].Source.TrySetResult(f.Provider.ArrowPrefab);
             yield return null;
-            f.Controller.Tick(0f);
+            TestCharacterSelection.Tick(f.Controller, 0f);
             Assert.That(f.Controller.HintStatus, Is.EqualTo(HintStatus.None));
             Assert.That(ActiveArrows(f), Is.Zero);
         }
@@ -337,12 +337,12 @@ namespace Sokoban.Tests.PlayMode
             Move(f, MoveCommand.Right);
             yield return BeginArrow(f);
             f.Controller.RequestUndo();
-            f.Controller.Tick(0.16f);
+            TestCharacterSelection.Tick(f.Controller, 0.16f);
             Assert.That(f.Controller.Moves, Is.Zero);
             Assert.That(f.Provider.ArrowLoads[0].Token.IsCancellationRequested, Is.True);
             f.Provider.ArrowLoads[0].Source.TrySetResult(f.Provider.ArrowPrefab);
             yield return null;
-            f.Controller.Tick(0f);
+            TestCharacterSelection.Tick(f.Controller, 0f);
             Assert.That(f.Controller.HintStatus, Is.EqualTo(HintStatus.None));
             Assert.That(ActiveArrows(f), Is.Zero);
         }
@@ -354,13 +354,13 @@ namespace Sokoban.Tests.PlayMode
             yield return BeginArrow(f);
             Transform previousRoot = f.Root.GetChild(0);
             f.Controller.RequestRestart();
-            f.Controller.Tick(0f);
-            f.Controller.Tick(0f);
+            TestCharacterSelection.Tick(f.Controller, 0f);
+            TestCharacterSelection.Tick(f.Controller, 0f);
             yield return BeginArrow(f, 1);
             Assert.That(f.Provider.ArrowLoads[0].Token.IsCancellationRequested, Is.True);
             f.Provider.ArrowLoads[0].Source.TrySetResult(f.Provider.ArrowPrefab);
             yield return null;
-            f.Controller.Tick(0f);
+            TestCharacterSelection.Tick(f.Controller, 0f);
             Assert.That(previousRoot == null, Is.True);
             Assert.That(ActiveArrows(f), Is.Zero);
             Assert.That(f.Controller.HintStatus, Is.EqualTo(HintStatus.Calculating));
@@ -378,7 +378,7 @@ namespace Sokoban.Tests.PlayMode
             yield return BeginArrow(f, 1);
             f.Provider.ArrowLoads[0].Source.TrySetException(new InvalidOperationException("stale arrow failure"));
             yield return null;
-            f.Controller.Tick(0f);
+            TestCharacterSelection.Tick(f.Controller, 0f);
             Assert.That(f.Controller.HintStatus, Is.EqualTo(HintStatus.Calculating));
             Assert.That(ActiveArrows(f), Is.Zero);
             Assert.That(SimulationOf(f).BoardRevision, Is.Zero);
@@ -394,14 +394,14 @@ namespace Sokoban.Tests.PlayMode
             yield return BeginArrow(f);
             f.Provider.Pending = new UniTaskCompletionSource<GameObject>();
             f.Controller.RequestNextSkin();
-            f.Controller.Tick(0f);
+            TestCharacterSelection.Tick(f.Controller, 0f);
             Assert.That(f.Provider.ArrowLoads[0].Token.IsCancellationRequested, Is.True);
             Assert.That(f.Controller.HintStatus, Is.EqualTo(HintStatus.None));
             f.Provider.Pending.TrySetResult(f.Provider.Prefab);
-            f.Controller.Tick(0f);
+            TestCharacterSelection.Tick(f.Controller, 0f);
             f.Provider.ArrowLoads[0].Source.TrySetResult(f.Provider.ArrowPrefab);
             yield return null;
-            f.Controller.Tick(0f);
+            TestCharacterSelection.Tick(f.Controller, 0f);
             Assert.That(f.Controller.CanHint, Is.True);
             Assert.That(ActiveArrows(f), Is.Zero);
         }
@@ -452,14 +452,14 @@ namespace Sokoban.Tests.PlayMode
             Fixture f = Create();
             f.Controller.RequestHint();
             f.Controller.RequestRestart();
-            f.Controller.Tick(0f);
-            f.Controller.Tick(0f);
+            TestCharacterSelection.Tick(f.Controller, 0f);
+            TestCharacterSelection.Tick(f.Controller, 0f);
             Assert.That(f.Service.Calls, Is.Empty);
             f.Controller.RequestHint();
             f.Input.NextLevelPressed = true;
-            f.Controller.Tick(0f);
+            TestCharacterSelection.Tick(f.Controller, 0f);
             f.Input.NextLevelPressed = false;
-            f.Controller.Tick(0f);
+            TestCharacterSelection.Tick(f.Controller, 0f);
             Assert.That(f.Service.Calls, Is.Empty);
             Assert.That(f.Controller.LevelNumber, Is.EqualTo(2));
             yield return null;
@@ -473,7 +473,7 @@ namespace Sokoban.Tests.PlayMode
             for (int frame = 0; frame < 20 && f.Provider.ArrowLoads.Count <= requestIndex; frame++)
             {
                 yield return null;
-                f.Controller.Tick(0f);
+                TestCharacterSelection.Tick(f.Controller, 0f);
             }
             Assert.That(f.Provider.ArrowLoads.Count, Is.EqualTo(requestIndex + 1));
         }
@@ -502,7 +502,7 @@ namespace Sokoban.Tests.PlayMode
             for (var frame = 0; frame < 20 && f.Controller.HintStatus == HintStatus.Calculating; frame++)
             {
                 yield return null;
-                f.Controller.Tick(0f);
+                TestCharacterSelection.Tick(f.Controller, 0f);
             }
             Assert.That(f.Controller.HintStatus, Is.Not.EqualTo(HintStatus.Calculating));
         }
@@ -511,14 +511,14 @@ namespace Sokoban.Tests.PlayMode
         {
             Assert.That(f.Controller.CanHint, Is.True);
             f.Controller.RequestHint();
-            f.Controller.Tick(0f);
+            TestCharacterSelection.Tick(f.Controller, 0f);
             Assert.That(f.Controller.HintStatus, Is.EqualTo(HintStatus.Calculating));
         }
 
         private static void Move(Fixture f, MoveCommand move)
         {
             f.Input.Move = move;
-            f.Controller.Tick(0.16f);
+            TestCharacterSelection.Tick(f.Controller, 0.16f);
             f.Input.Move = default;
         }
 
@@ -544,10 +544,15 @@ namespace Sokoban.Tests.PlayMode
             _objects.Add(settings);
             level ??= LevelParser.Parse("########\n#@-$--.#\n########");
             var hints = new HintCoordinator(service ?? controlled, provider);
-            var controller = new GameplayController(input, new Source(level), hints, factory, new TestStaticData { Gameplay = settings });
+            var data = new TestStaticData { Gameplay = settings };
+            TestCharacterSelection.Configure(data, _objects);
+            var catalog = ScriptableObject.CreateInstance<BackgroundCatalog>();
+            _objects.Add(catalog);
+            var backgrounds = TestBackgrounds.Create(data, CreateObject("Background target"), catalog);
+            var controller = new GameplayController(input, new Source(level), hints, backgrounds, factory, data);
             _controllers.Add(controller);
             controller.Initialize();
-            controller.Tick(0f);
+            TestCharacterSelection.Tick(controller, 0f);
             return new Fixture(controller, hints, input, controlled, provider, root);
         }
 
@@ -584,7 +589,7 @@ namespace Sokoban.Tests.PlayMode
             public MoveCommand ReadMove() => Move;
             public bool RestartPressed => false;
             public bool NextLevelPressed { get; set; }
-            public bool NextSkinPressed => false;
+            public bool IsNeutral => true;
             public bool UndoPressed => false;
         }
 

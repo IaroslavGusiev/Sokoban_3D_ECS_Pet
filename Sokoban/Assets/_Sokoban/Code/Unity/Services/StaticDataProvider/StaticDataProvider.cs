@@ -46,6 +46,9 @@ namespace Sokoban.Presentation
         public GameplaySettings GetGameplaySettings() => 
             _configs.Gameplay;
         
+        public BackgroundCatalog GetBackgroundCatalog() =>
+            _configs.Backgrounds;
+
         public ViewCatalog GetViewCatalog() => 
             _configs.Views;
         
@@ -80,7 +83,9 @@ namespace Sokoban.Presentation
                 var levels = Single<LevelList>(assets);
                 var views = Single<ViewCatalog>(assets);
                 
-                _configs = new Configs(gameplay, levels, views);
+                var backgrounds = Single<BackgroundCatalog>(assets);
+
+                _configs = new Configs(gameplay, levels, views, backgrounds);
             }
             catch
             {
@@ -134,10 +139,12 @@ namespace Sokoban.Presentation
         {
             public readonly LevelList Levels;
             public readonly ViewCatalog Views;
+            public readonly BackgroundCatalog Backgrounds;
             public readonly GameplaySettings Gameplay;
 
-            public Configs(GameplaySettings gameplay, LevelList levels, ViewCatalog views)
+            public Configs(GameplaySettings gameplay, LevelList levels, ViewCatalog views, BackgroundCatalog backgrounds)
             {
+                Backgrounds = backgrounds;
                 Views = views;
                 Levels = levels;
                 Gameplay = gameplay;

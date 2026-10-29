@@ -151,7 +151,7 @@ namespace Sokoban.Tests.PlayMode
             try
             {
                 controller.Initialize();
-                controller.Tick();
+                TestCharacterSelection.Tick(controller);
                 Simulation simulation = SimulationOf(controller);
                 World world = simulation.World;
                 using var movement = world.SubscribeComponentChanged<GridPosition>(
@@ -163,7 +163,7 @@ namespace Sokoban.Tests.PlayMode
                     });
                 using var disposed = world.SubscribeWorldDisposed(_ => trace.Add("disposed"));
                 simulation.Send(MoveCommand.Left);
-                controller.Tick();
+                TestCharacterSelection.Tick(controller);
                 Assert.That(trace, Is.EqualTo(new[] { "movement", "disposed" }));
                 Assert.That(SimulationOf(controller), Is.Not.SameAs(simulation));
                 Assert.That(source.LoadCalls, Is.EqualTo(1), "Restart reuses content instead of loading again.");
@@ -358,11 +358,11 @@ namespace Sokoban.Tests.PlayMode
             try
             {
                 controller.Initialize();
-                controller.Tick();
+                TestCharacterSelection.Tick(controller);
                 Simulation old = SimulationOf(controller);
                 input.Move = MoveCommand.Left;
                 input.NextLevelPressed = true;
-                controller.Tick();
+                TestCharacterSelection.Tick(controller);
                 Assert.That(Player(old).Get<GridPosition>(), Is.EqualTo(new GridPosition(2, 2)));
                 Assert.That(SimulationOf(controller), Is.SameAs(old));
 
@@ -370,7 +370,7 @@ namespace Sokoban.Tests.PlayMode
                 input.NextLevelPressed = false;
                 input.Move = MoveCommand.Right;
                 old.Send(MoveCommand.Up);
-                controller.Tick();
+                TestCharacterSelection.Tick(controller);
                 Assert.That(Player(old).Get<GridPosition>(), Is.EqualTo(new GridPosition(2, 2)));
                 Assert.That(Player(old).Has<MoveRequest>(), Is.True);
                 Assert.That(source.Requested, Is.EqualTo(new[] { 0, 1 }));
@@ -383,7 +383,7 @@ namespace Sokoban.Tests.PlayMode
                 Assert.That(Player(SimulationOf(controller)).Get<GridPosition>(), Is.EqualTo(second.PlayerStart));
 
                 input.RestartPressed = true;
-                controller.Tick();
+                TestCharacterSelection.Tick(controller);
                 Assert.That(source.LoadCalls, Is.EqualTo(2));
 
                 Assert.That(Player(SimulationOf(controller)).Get<GridPosition>(), Is.EqualTo(second.PlayerStart));
@@ -404,7 +404,7 @@ namespace Sokoban.Tests.PlayMode
             var source = new TestLevelSource((_, _) => pending.Task);
             var controller = CreateController(new TestInput(), source, "Cancelled root");
             controller.Initialize();
-            controller.Tick();
+            TestCharacterSelection.Tick(controller);
             controller.Dispose();
             Assert.That(source.LastToken.IsCancellationRequested, Is.True);
             pending.TrySetResult(content);
@@ -426,14 +426,14 @@ namespace Sokoban.Tests.PlayMode
             try
             {
                 controller.Initialize();
-                controller.Tick();
+                TestCharacterSelection.Tick(controller);
                 Simulation old = SimulationOf(controller);
                 LogAssert.Expect(LogType.Exception, new Regex("InvalidOperationException: planned load failure"));
                 input.NextLevelPressed = true;
-                controller.Tick();
+                TestCharacterSelection.Tick(controller);
                 input.NextLevelPressed = false;
                 input.Move = MoveCommand.Left;
-                controller.Tick();
+                TestCharacterSelection.Tick(controller);
                 Assert.That(SimulationOf(controller), Is.SameAs(old));
                 Assert.That(Player(old).Get<GridPosition>(), Is.EqualTo(content.PlayerStart));
 
@@ -441,7 +441,7 @@ namespace Sokoban.Tests.PlayMode
                 Assert.That(controller.Phase, Is.EqualTo(GameplayPhase.LevelFailed));
                 LogAssert.Expect(LogType.Exception, new Regex("InvalidOperationException: planned load failure"));
                 input.RestartPressed = true;
-                controller.Tick();
+                TestCharacterSelection.Tick(controller);
                 input.RestartPressed = false;
                 Assert.That(source.Requested, Is.EqualTo(new[] { 0, 1, 1 }));
                 Assert.That(SimulationOf(controller), Is.SameAs(old));
@@ -497,7 +497,7 @@ namespace Sokoban.Tests.PlayMode
                 PressKeys(keyboard, Key.R, Key.N, Key.K, Key.RightArrow);
                 Assert.That(input.RestartPressed, Is.True);
                 Assert.That(input.NextLevelPressed, Is.True);
-                Assert.That(input.NextSkinPressed, Is.True);
+                Assert.That(input.IsNeutral, Is.False);
                 Assert.That(input.ReadMove(), Is.EqualTo(MoveCommand.Right));
                 Assert.That(player.Get<MoveRequest>().Command, Is.EqualTo(MoveCommand.Left));
                 Assert.That(player.Get<GridPosition>(), Is.EqualTo(new GridPosition(3, 2)));
@@ -549,8 +549,13 @@ namespace Sokoban.Tests.PlayMode
             _objects.Add(settings);
             var provider = CreateViewProvider();
             var factory = new LevelRunFactory(new LevelRoot(CreateObject(rootName).transform), provider, new LevelPopulator(), new SimulationPipelineFactory(), new ViewPipelineFactory());
+            var data = new TestStaticData { Gameplay = settings };
+                TestCharacterSelection.Configure(data, _objects);
+            var catalog = ScriptableObject.CreateInstance<BackgroundCatalog>();
+            _objects.Add(catalog);
+            var backgrounds = TestBackgrounds.Create(data, CreateObject("Background target"), catalog);
             return new GameplayController(input, source, new HintCoordinator(new HintService(new HintSolver()), provider),
-                factory, new TestStaticData { Gameplay = settings });
+                backgrounds, factory, data);
         }
 
         private static void SetField(object target, string name, object value) =>
@@ -639,7 +644,7 @@ namespace Sokoban.Tests.PlayMode
             public bool UndoPressed => false;
             public bool RestartPressed { get; set; }
             public bool NextLevelPressed { get; set; }
-            public bool NextSkinPressed { get; set; }
+            public bool IsNeutral => true;
             public MoveCommand Move { get; set; }
             public MoveCommand ReadMove() => Move;
         }

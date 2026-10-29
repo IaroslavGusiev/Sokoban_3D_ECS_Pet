@@ -71,10 +71,12 @@ namespace Sokoban.Tests.PlayMode
             Entity player = simulation.World.Single(entity => entity.Has<PlayerTag>());
             Assert.That(StateOf(controller), Is.EqualTo("BindingViews"));
             simulation.Send(MoveCommand.Right);
-            controller.Tick();
+            TestCharacterSelection.Tick(controller);
             Assert.That(input.Reads, Is.Zero);
             Assert.That(player.Get<GridPosition>(), Is.EqualTo(new GridPosition(2, 1)));
-            Assert.That(player.Has<ViewPending>(), Is.True);
+            Assert.That(player.Has<PlayerViewDeferred>(), Is.True);
+            Assert.That(player.Has<ViewPending>(), Is.False);
+            Assert.That(simulation.World.Any(e => e.Has<FloorTag>() && e.Has<ViewPending>()), Is.True);
             provider.Complete(CreateObject("Prefab"));
             Vector3 initialPosition = default;
             using var placement = simulation.World.SubscribeComponentAdded<TransformComponent>(
@@ -86,14 +88,14 @@ namespace Sokoban.Tests.PlayMode
                         component.Transform.position = Vector3.one * 50;
                     }
                 });
-            controller.Tick();
+            TestCharacterSelection.Tick(controller);
             Transform view = player.Get<TransformComponent>().Transform;
             Assert.That(initialPosition, Is.EqualTo(new Vector3(2, 0, 1)),
                 "Binding must use the latest position before the next projection tick.");
             Assert.That(view.position, Is.EqualTo(new Vector3(2, 0, 1)));
             Assert.That(StateOf(controller), Is.EqualTo("Playing"));
             Assert.That(input.Reads, Is.Zero);
-            controller.Tick();
+            TestCharacterSelection.Tick(controller);
             Assert.That(input.Reads, Is.EqualTo(1));
             Assert.That(player.Get<GridPosition>(), Is.EqualTo(new GridPosition(3, 1)));
         }
@@ -113,13 +115,13 @@ namespace Sokoban.Tests.PlayMode
             if (failed)
             {
                 provider.Fail();
-                controller.Tick();
+                TestCharacterSelection.Tick(controller);
                 Assert.That(StateOf(controller), Is.EqualTo("ViewsFailed"));
             }
             provider.Reset();
             input.RestartPressed = !next;
             input.NextLevelPressed = next;
-            controller.Tick();
+            TestCharacterSelection.Tick(controller);
             input.RestartPressed = false;
             input.NextLevelPressed = false;
             Assert.That(SimulationOf(controller), Is.Not.SameAs(old));
@@ -127,12 +129,12 @@ namespace Sokoban.Tests.PlayMode
             Assert.That(source.Requests, Is.EqualTo(next ? new[] { 0, 1 } : new[] { 0 }));
             Assert.That(input.Reads, Is.Zero);
             provider.Complete(CreateObject("Recovered prefab"));
-            controller.Tick();
+            TestCharacterSelection.Tick(controller);
             Assert.That(StateOf(controller), Is.EqualTo("Playing"));
         }
 
         [Test]
-        public void PlayingSkinFailure_PausesMovementAndRecoversThroughSkinInput()
+        public void PlayingSkinFailure_PausesMovementAndRecoversThroughInternalReplacement()
         {
             var provider = new Provider();
             provider.Complete(CreateObject("Default prefab"));
@@ -140,44 +142,42 @@ namespace Sokoban.Tests.PlayMode
             var source = new Source();
             using var controller = CreateController(input, source, provider);
             controller.Initialize();
-            controller.Tick();
+            TestCharacterSelection.Tick(controller, 0f);
             Assert.That(StateOf(controller), Is.EqualTo("Playing"));
             Simulation simulation = SimulationOf(controller);
             Entity player = simulation.World.Single(entity => entity.Has<PlayerTag>());
             provider.Reset();
-            input.NextSkinPressed = true;
+            controller.RequestNextSkin();
             input.Move = MoveCommand.Left;
-            controller.Tick();
-            input.NextSkinPressed = false;
+            TestCharacterSelection.Tick(controller, 0f);
             input.Move = default;
             Assert.That(StateOf(controller), Is.EqualTo("Playing"));
             Assert.That(player.Get<GridPosition>(), Is.EqualTo(new GridPosition(1, 1)));
             Assert.That(player.Has<ViewPending>(), Is.True);
             provider.Fail();
-            controller.Tick();
+            TestCharacterSelection.Tick(controller, 0f);
             Assert.That(StateOf(controller), Is.EqualTo("ViewsFailed"));
             Assert.That(player.Has<ViewFailed>(), Is.True);
             Assert.That(player.Has<TransformComponent>(), Is.False);
             int reads = input.Reads;
             input.Move = MoveCommand.Right;
-            controller.Tick();
+            TestCharacterSelection.Tick(controller, 0f);
             Assert.That(input.Reads, Is.EqualTo(reads));
             Assert.That(player.Get<GridPosition>(), Is.EqualTo(new GridPosition(1, 1)));
             provider.Reset();
-            input.NextSkinPressed = true;
-            controller.Tick();
-            input.NextSkinPressed = false;
+            controller.RequestNextSkin();
+            TestCharacterSelection.Tick(controller, 0f);
             Assert.That(StateOf(controller), Is.EqualTo("BindingViews"));
             Assert.That(player.Has<ViewFailed>(), Is.False);
             Assert.That(input.Reads, Is.EqualTo(reads));
             provider.Complete(CreateObject("Recovered Default prefab"));
-            controller.Tick();
+            TestCharacterSelection.Tick(controller, 0f);
             Assert.That(StateOf(controller), Is.EqualTo("Playing"));
             Assert.That(input.Reads, Is.EqualTo(reads));
             Assert.That(player.Get<ViewSkin>().Id, Is.EqualTo(SkinId.Punk));
             Assert.That(player.Has<TransformComponent>(), Is.True);
-            controller.Tick(0.16f);
-            controller.Tick();
+            TestCharacterSelection.Tick(controller, 0.16f);
+            TestCharacterSelection.Tick(controller, 0f);
             Assert.That(player.Get<GridPosition>(), Is.EqualTo(new GridPosition(2, 1)));
             Assert.That(SimulationOf(controller), Is.SameAs(simulation));
             Assert.That(source.Requests, Is.EqualTo(new[] { 0 }));
@@ -193,24 +193,22 @@ namespace Sokoban.Tests.PlayMode
             var source = new Source();
             using var controller = CreateController(input, source, provider);
             controller.Initialize();
-            controller.Tick();
+            TestCharacterSelection.Tick(controller);
             Simulation simulation = SimulationOf(controller);
             simulation.World.Single(entity => entity.Has<BoxTag>()).Set(new GridPosition(4, 2));
             provider.FailAlternatePlayer = true;
-            input.NextSkinPressed = true;
-            controller.Tick();
-            input.NextSkinPressed = false;
+            controller.RequestNextSkin();
+            TestCharacterSelection.Tick(controller);
             Assert.That(simulation.IsCompleted, Is.True);
             Assert.That(StateOf(controller), Is.EqualTo("ViewsFailed"));
-            controller.Tick();
+            TestCharacterSelection.Tick(controller);
             Assert.That(StateOf(controller), Is.EqualTo("ViewsFailed"));
             Assert.That(source.Requests, Is.EqualTo(new[] { 0 }));
             Assert.That(controller.Results, Is.Empty);
-            input.NextSkinPressed = true;
-            controller.Tick();
-            input.NextSkinPressed = false;
+            controller.RequestNextSkin();
+            TestCharacterSelection.Tick(controller);
             Assert.That(StateOf(controller), Is.EqualTo("Playing"));
-            controller.Tick();
+            TestCharacterSelection.Tick(controller);
             Assert.That(StateOf(controller), Is.EqualTo("Completed"));
             Assert.That(controller.Results.Count, Is.EqualTo(1));
         }
@@ -229,11 +227,11 @@ namespace Sokoban.Tests.PlayMode
             Assert.That(SimulationOf(controller), Is.Null);
             source.Fail = false;
             input.RestartPressed = true;
-            controller.Tick();
+            TestCharacterSelection.Tick(controller);
             input.RestartPressed = false;
             Assert.That(source.Requests, Is.EqualTo(new[] { 0, 0 }));
             Assert.That(StateOf(controller), Is.EqualTo("BindingViews"));
-            controller.Tick();
+            TestCharacterSelection.Tick(controller);
             Assert.That(StateOf(controller), Is.EqualTo("Playing"));
         }
 
@@ -246,34 +244,33 @@ namespace Sokoban.Tests.PlayMode
             var input = new Input();
             using var controller = CreateController(input, source, provider);
             controller.Initialize();
-            controller.Tick();
+            TestCharacterSelection.Tick(controller);
             Simulation simulation = SimulationOf(controller);
             Entity player = simulation.World.Single(entity => entity.Has<PlayerTag>());
             provider.Reset();
-            input.NextSkinPressed = true;
+            controller.RequestNextSkin();
             input.Move = MoveCommand.Left;
-            controller.Tick();
-            input.NextSkinPressed = false;
+            TestCharacterSelection.Tick(controller);
             input.Move = default;
             Assert.That(StateOf(controller), Is.EqualTo("Playing"));
             Assert.That(player.Get<GridPosition>(), Is.EqualTo(new GridPosition(1, 1)));
             Assert.That(player.Get<ViewSkin>().Id, Is.EqualTo(SkinId.Alternate));
             Assert.That(player.Has<ViewPending>(), Is.True);
             int reads = input.Reads;
-            controller.Tick();
+            TestCharacterSelection.Tick(controller);
             Assert.That(input.Reads, Is.EqualTo(reads + 1));
             Assert.That(StateOf(controller), Is.EqualTo("Playing"));
             provider.Complete(CreateObject("Alternate skin prefab"));
             input.RestartPressed = true;
-            controller.Tick();
+            TestCharacterSelection.Tick(controller);
             input.RestartPressed = false;
             Assert.That(SimulationOf(controller), Is.Not.SameAs(simulation));
             Assert.That(SimulationOf(controller).World.Single(entity => entity.Has<PlayerTag>()).Get<ViewSkin>().Id,
                 Is.EqualTo(SkinId.Alternate));
             Assert.That(provider.Requests.Last(key => key.Kind == ViewKind.Player).Skin, Is.EqualTo(SkinId.Alternate));
-            controller.Tick();
+            TestCharacterSelection.Tick(controller);
             input.NextLevelPressed = true;
-            controller.Tick();
+            TestCharacterSelection.Tick(controller);
             input.NextLevelPressed = false;
             Assert.That(SimulationOf(controller).World.Single(entity => entity.Has<PlayerTag>()).Get<ViewSkin>().Id,
                 Is.EqualTo(SkinId.Alternate));
@@ -282,7 +279,7 @@ namespace Sokoban.Tests.PlayMode
         }
 
         [Test]
-        public void PersistedSkinViewFailure_RecoversThroughSkinInputWithoutRestart()
+        public void PersistedCharacterFailure_RecoversThroughSelectionWithoutRestart()
         {
             var provider = new Provider();
             provider.Complete(CreateObject("Default skin prefab"));
@@ -290,29 +287,28 @@ namespace Sokoban.Tests.PlayMode
             var source = new Source();
             using var controller = CreateController(input, source, provider);
             controller.Initialize();
-            controller.Tick();
-            input.NextSkinPressed = true;
-            controller.Tick();
-            input.NextSkinPressed = false;
+            TestCharacterSelection.Tick(controller);
+            controller.RequestNextSkin();
+            TestCharacterSelection.Tick(controller);
             provider.FailAlternatePlayer = true;
             input.RestartPressed = true;
-            controller.Tick();
+            TestCharacterSelection.Tick(controller);
             input.RestartPressed = false;
-            controller.Tick();
-            Assert.That(StateOf(controller), Is.EqualTo("ViewsFailed"));
+            TestCharacterSelection.Tick(controller);
+            Assert.That(StateOf(controller), Is.EqualTo("CharacterFailed"));
             Entity player = SimulationOf(controller).World.Single(entity => entity.Has<PlayerTag>());
             Assert.That(player.Get<ViewSkin>().Id, Is.EqualTo(SkinId.Alternate));
             Assert.That(player.Has<ViewFailed>(), Is.True);
             int reads = input.Reads;
             provider.Reset();
-            input.NextSkinPressed = true;
-            controller.Tick();
-            input.NextSkinPressed = false;
-            Assert.That(StateOf(controller), Is.EqualTo("BindingViews"));
+            controller.RequestCharacter(SkinId.Punk);
+            controller.RequestConfirmCharacter();
+            controller.Tick(0f);
+            Assert.That(StateOf(controller), Is.EqualTo("BindingCharacter"));
             Assert.That(player.Has<ViewFailed>(), Is.False);
             Assert.That(player.Has<ViewPending>(), Is.True);
             provider.Complete(CreateObject("Recovered Default skin prefab"));
-            controller.Tick();
+            TestCharacterSelection.Tick(controller);
             Assert.That(StateOf(controller), Is.EqualTo("Playing"));
             Assert.That(input.Reads, Is.EqualTo(reads));
             Assert.That(player.Get<ViewSkin>().Id, Is.EqualTo(SkinId.Punk));
@@ -339,6 +335,7 @@ namespace Sokoban.Tests.PlayMode
             if (trigger != "initial")
             {
                 controller.Initialize();
+                TestCharacterSelection.Tick(controller, 0f);
                 SimulationOf(controller).World.SubscribeWorldDisposed(_ => previousWorldDisposed = true);
             }
 
@@ -370,13 +367,13 @@ namespace Sokoban.Tests.PlayMode
             int requestsBeforeRecovery = source.Requests.Count;
             input.RestartPressed = !recoverWithNext;
             input.NextLevelPressed = recoverWithNext;
-            controller.Tick();
+            TestCharacterSelection.Tick(controller);
             input.RestartPressed = false;
             input.NextLevelPressed = false;
             Assert.That(StateOf(controller), Is.EqualTo("BindingViews"));
             Assert.That(SimulationOf(controller), Is.Not.Null);
             Assert.That(source.Requests.Count, Is.EqualTo(requestsBeforeRecovery + 1));
-            controller.Tick();
+            TestCharacterSelection.Tick(controller);
             Assert.That(StateOf(controller), Is.EqualTo("Playing"));
         }
 
@@ -395,9 +392,9 @@ namespace Sokoban.Tests.PlayMode
             Assert.DoesNotThrow(controller.Tick);
             source.ReturnNull = false;
             input.RestartPressed = true;
-            controller.Tick();
+            TestCharacterSelection.Tick(controller);
             input.RestartPressed = false;
-            controller.Tick();
+            TestCharacterSelection.Tick(controller);
             Assert.That(StateOf(controller), Is.EqualTo("Playing"));
         }
 
@@ -408,8 +405,12 @@ namespace Sokoban.Tests.PlayMode
             var factory = new LevelRunFactory(new LevelRoot(CreateObject("Level root").transform), provider, new LevelPopulator(), new SimulationPipelineFactory(), new ViewPipelineFactory());
             staticData ??= new TestStaticData();
             staticData.Gameplay = settings;
+            TestCharacterSelection.Configure(staticData, _objects);
+            var catalog = ScriptableObject.CreateInstance<BackgroundCatalog>();
+            _objects.Add(catalog);
+            var backgrounds = TestBackgrounds.Create(staticData, CreateObject("Background target"), catalog);
             return new GameplayController(input, source, new HintCoordinator(new HintService(new HintSolver()), provider),
-                factory, staticData);
+                backgrounds, factory, staticData);
         }
 
         [Test]
@@ -417,17 +418,17 @@ namespace Sokoban.Tests.PlayMode
         {
             var data = new TestStaticData { Pending = new UniTaskCompletionSource() };
             var source = new Source();
-            var input = new Input { RestartPressed = true, NextLevelPressed = true, NextSkinPressed = true };
+            var input = new Input { RestartPressed = true, NextLevelPressed = true };
             var provider = new Provider();
             provider.Complete(CreateObject("Prefab"));
             using var controller = CreateController(input, source, provider, staticData: data);
             controller.Initialize();
-            controller.Tick();
+            TestCharacterSelection.Tick(controller);
             Assert.That(StateOf(controller), Is.EqualTo("Loading"));
             Assert.That(source.Requests, Is.Empty);
             Assert.That(input.Reads, Is.Zero);
             Assert.That(SimulationOf(controller), Is.Null);
-            input.RestartPressed = input.NextLevelPressed = input.NextSkinPressed = false;
+            input.RestartPressed = input.NextLevelPressed = false;
             data.Pending.TrySetResult();
             Assert.That(StateOf(controller), Is.EqualTo("BindingViews"));
             Assert.That(source.Requests, Is.EqualTo(new[] { 0 }));
@@ -450,7 +451,7 @@ namespace Sokoban.Tests.PlayMode
             Assert.That(source.Requests, Is.Empty);
             data.Pending = null;
             input.RestartPressed = true;
-            controller.Tick();
+            TestCharacterSelection.Tick(controller);
             Assert.That(StateOf(controller), Is.EqualTo("BindingViews"));
             Assert.That(data.LoadCalls, Is.EqualTo(2));
             Assert.That(source.Requests, Is.EqualTo(new[] { 0 }));
@@ -478,11 +479,11 @@ namespace Sokoban.Tests.PlayMode
             var input = new Input();
             using var controller = CreateController(input, source, provider, 1f);
             controller.Initialize();
-            controller.Tick(20f);
+            TestCharacterSelection.Tick(controller, 20f);
             Assert.That(controller.RemainingSeconds, Is.EqualTo(1f));
             Assert.That(StateOf(controller), Is.EqualTo("BindingViews"));
             provider.Complete(CreateObject("Prefab"));
-            controller.Tick(20f);
+            TestCharacterSelection.Tick(controller, 20f);
             Assert.That(StateOf(controller), Is.EqualTo("Playing"));
             Assert.That(controller.RemainingSeconds, Is.EqualTo(1f));
             Simulation previous = SimulationOf(controller);
@@ -490,7 +491,7 @@ namespace Sokoban.Tests.PlayMode
             Assert.That(previousLevel.Get<LevelTimer>().RemainingSeconds, Is.EqualTo(1f));
             bool disposed = false;
             using var subscription = previous.World.SubscribeWorldDisposed(_ => disposed = true);
-            controller.Tick(1f);
+            TestCharacterSelection.Tick(controller, 1f);
             Assert.That(StateOf(controller), Is.EqualTo("BindingViews"));
             Assert.That(disposed, Is.True);
             Assert.That(SimulationOf(controller), Is.Not.SameAs(previous));
@@ -500,7 +501,7 @@ namespace Sokoban.Tests.PlayMode
             Assert.That(freshLevel.Has<LevelTimedOutTag>() || freshLevel.Has<LevelCompletedTag>(), Is.False);
             Assert.That(controller.RemainingSeconds, Is.EqualTo(1f));
             Assert.That(source.Requests, Is.EqualTo(new[] { 0 }));
-            controller.Tick(20f);
+            TestCharacterSelection.Tick(controller, 20f);
             Assert.That(StateOf(controller), Is.EqualTo("Playing"));
             Assert.That(controller.RemainingSeconds, Is.EqualTo(1f));
         }
@@ -514,15 +515,14 @@ namespace Sokoban.Tests.PlayMode
             var input = new Input();
             using var controller = CreateController(input, source, provider, 1f);
             controller.Initialize();
-            controller.Tick();
-            input.NextSkinPressed = true;
-            controller.Tick();
-            input.NextSkinPressed = false;
+            TestCharacterSelection.Tick(controller);
+            controller.RequestNextSkin();
+            TestCharacterSelection.Tick(controller);
             Simulation previous = SimulationOf(controller);
             previous.Tick(1f);
             input.NextLevelPressed = true;
             input.RestartPressed = true;
-            controller.Tick();
+            TestCharacterSelection.Tick(controller);
             Assert.That(StateOf(controller), Is.EqualTo("BindingViews"));
             Assert.That(SimulationOf(controller), Is.Not.SameAs(previous));
             Assert.That(controller.RemainingSeconds, Is.EqualTo(1f));
@@ -540,21 +540,21 @@ namespace Sokoban.Tests.PlayMode
             var input = new Input();
             using var controller = CreateController(input, source, provider, 5f);
             controller.Initialize();
-            controller.Tick(20f);
-            controller.Tick(1f);
+            TestCharacterSelection.Tick(controller, 20f);
+            TestCharacterSelection.Tick(controller, 1f);
             Assert.That(controller.RemainingSeconds, Is.EqualTo(4f));
             var player = SimulationOf(controller).World.Single(entity => entity.Has<PlayerTag>());
             player.Set<ViewFailed>();
-            controller.Tick(1f);
+            TestCharacterSelection.Tick(controller, 1f);
             Assert.That(StateOf(controller), Is.EqualTo("ViewsFailed"));
             Assert.That(controller.RemainingSeconds, Is.EqualTo(3f));
-            controller.Tick(20f);
+            TestCharacterSelection.Tick(controller, 20f);
             Assert.That(controller.RemainingSeconds, Is.EqualTo(3f));
             player.Remove<ViewFailed>();
-            controller.Tick(20f);
+            TestCharacterSelection.Tick(controller, 20f);
             Assert.That(StateOf(controller), Is.EqualTo("Playing"));
             Assert.That(controller.RemainingSeconds, Is.EqualTo(3f));
-            controller.Tick(0.5f);
+            TestCharacterSelection.Tick(controller, 0.5f);
             Assert.That(controller.RemainingSeconds, Is.EqualTo(2.5f));
         }
 
@@ -566,13 +566,12 @@ namespace Sokoban.Tests.PlayMode
             var input = new Input();
             using var controller = CreateController(input, new Source(), provider, 5f);
             controller.Initialize();
-            controller.Tick();
+            TestCharacterSelection.Tick(controller);
             provider.Reset();
-            input.NextSkinPressed = true;
-            controller.Tick();
-            input.NextSkinPressed = false;
+            controller.RequestNextSkin();
+            TestCharacterSelection.Tick(controller);
             float before = controller.RemainingSeconds;
-            controller.Tick(1f);
+            TestCharacterSelection.Tick(controller, 1f);
             Assert.That(StateOf(controller), Is.EqualTo("Playing"));
             Assert.That(controller.RemainingSeconds, Is.EqualTo(before - 1f).Within(0.0001f));
             var player = SimulationOf(controller).World.Single(entity => entity.Has<PlayerTag>());
@@ -589,19 +588,19 @@ namespace Sokoban.Tests.PlayMode
             var source = new Source();
             using var controller = CreateController(new Input(), source, provider, 5f);
             controller.Initialize();
-            controller.Tick(20f);
+            TestCharacterSelection.Tick(controller, 20f);
             Simulation simulation = SimulationOf(controller);
             Entity previousLevel = simulation.World.Single(entity => entity.Has<LevelStateTag>());
             bool disposed = false;
             using var subscription = simulation.World.SubscribeWorldDisposed(_ => disposed = true);
             simulation.World.Single(entity => entity.Has<BoxTag>()).Set(new GridPosition(4, 2));
-            controller.Tick(winningDelta);
+            TestCharacterSelection.Tick(controller, winningDelta);
             Assert.That(StateOf(controller), Is.EqualTo("Completed"));
             Assert.That(controller.RemainingSeconds, Is.EqualTo(5f));
             Assert.That(previousLevel.Has<LevelCompletedTag>(), Is.True);
-            controller.Tick(0.5f);
+            TestCharacterSelection.Tick(controller, 0.5f);
             Assert.That(controller.RemainingSeconds, Is.EqualTo(5f));
-            controller.Tick(0.25f);
+            TestCharacterSelection.Tick(controller, 0.25f);
             Assert.That(source.Requests, Is.EqualTo(new[] { 0, 1 }));
             Assert.That(StateOf(controller), Is.EqualTo("BindingViews"));
             Assert.That(controller.RemainingSeconds, Is.EqualTo(5f));
@@ -620,20 +619,20 @@ namespace Sokoban.Tests.PlayMode
             var source = new Source();
             using var controller = CreateController(new Input(), source, provider);
             controller.Initialize();
-            controller.Tick(0f);
+            TestCharacterSelection.Tick(controller, 0f);
             SimulationOf(controller).World.Single(entity => entity.Has<BoxTag>()).Set(new GridPosition(4, 2));
-            controller.Tick(0f);
-            controller.Tick(0.75f);
+            TestCharacterSelection.Tick(controller, 0f);
+            TestCharacterSelection.Tick(controller, 0.75f);
             Assert.That(source.Requests, Is.EqualTo(new[] { 0, 1 }));
 
-            controller.Tick(0f);
+            TestCharacterSelection.Tick(controller, 0f);
             SimulationOf(controller).World.Single(entity => entity.Has<BoxTag>()).Set(new GridPosition(4, 2));
-            controller.Tick(0f);
+            TestCharacterSelection.Tick(controller, 0f);
             Assert.That(StateOf(controller), Is.EqualTo("Completed"));
-            controller.Tick(0.5f);
+            TestCharacterSelection.Tick(controller, 0.5f);
             Assert.That(source.Requests, Is.EqualTo(new[] { 0, 1 }));
             Assert.That(StateOf(controller), Is.EqualTo("Completed"));
-            controller.Tick(0.25f);
+            TestCharacterSelection.Tick(controller, 0.25f);
             Assert.That(source.Requests, Is.EqualTo(new[] { 0, 1 }));
             Assert.That(StateOf(controller), Is.EqualTo("Finished"));
         }
@@ -649,18 +648,18 @@ namespace Sokoban.Tests.PlayMode
             using var controller = CreateController(new Input(), source, provider, 7f, delay);
             Assert.That(controller.RemainingSeconds, Is.EqualTo(7f));
             controller.Initialize();
-            controller.Tick(0f);
+            TestCharacterSelection.Tick(controller, 0f);
             SimulationOf(controller).World.Single(entity => entity.Has<BoxTag>()).Set(new GridPosition(4, 2));
-            controller.Tick(0.25f);
+            TestCharacterSelection.Tick(controller, 0.25f);
             Assert.That(StateOf(controller), Is.EqualTo("Completed"));
             if (delay > 0f)
             {
-                controller.Tick(delay - 0.25f);
+                TestCharacterSelection.Tick(controller, delay - 0.25f);
                 Assert.That(source.Requests, Is.EqualTo(new[] { 0 }));
                 Assert.That(controller.RemainingSeconds, Is.EqualTo(7f));
-                controller.Tick(0.25f);
+                TestCharacterSelection.Tick(controller, 0.25f);
             }
-            else controller.Tick(0f);
+            else TestCharacterSelection.Tick(controller, 0f);
             Assert.That(source.Requests, Is.EqualTo(new[] { 0, 1 }));
             Assert.That(controller.RemainingSeconds, Is.EqualTo(7f));
         }
@@ -684,14 +683,15 @@ namespace Sokoban.Tests.PlayMode
             if (state == "ViewsFailed")
             {
                 provider.Fail();
-                controller.Tick(0f);
+                TestCharacterSelection.Tick(controller, 0f);
             }
             else if (state == "LevelFailed")
             {
+                TestCharacterSelection.Tick(controller, 0f);
                 source.Fail = true;
                 input.NextLevelPressed = true;
                 LogAssert.Expect(LogType.Exception, new Regex("planned definition failure"));
-                controller.Tick(0f);
+                TestCharacterSelection.Tick(controller, 0f);
                 input.NextLevelPressed = false;
             }
             else if (state == "Completed" || state == "Finished")
@@ -699,9 +699,9 @@ namespace Sokoban.Tests.PlayMode
                 CompleteCurrentLevel(controller);
                 if (state == "Finished")
                 {
-                    controller.Tick(0.75f);
+                    TestCharacterSelection.Tick(controller, 0.75f);
                     CompleteCurrentLevel(controller);
-                    controller.Tick(0.75f);
+                    TestCharacterSelection.Tick(controller, 0.75f);
                 }
             }
             Assert.That(controller.Phase.ToString(), Is.EqualTo(state));
@@ -715,7 +715,7 @@ namespace Sokoban.Tests.PlayMode
             Assert.That(controller.CanUndo, Is.False);
             controller.RequestUndo();
             input.UndoPressed = true;
-            controller.Tick(0.25f);
+            TestCharacterSelection.Tick(controller, 0.25f);
             input.UndoPressed = false;
             Assert.That(player.Has<MoveRequest>(), Is.EqualTo(pending));
             Assert.That(player.Get<GridPosition>(), Is.EqualTo(position));
@@ -752,15 +752,15 @@ namespace Sokoban.Tests.PlayMode
             var source = new Source();
             using var controller = CreateController(input, source, provider);
             controller.Initialize();
-            controller.Tick();
+            TestCharacterSelection.Tick(controller);
             Simulation simulation = SimulationOf(controller);
             simulation.World.Single(entity => entity.Has<BoxTag>()).Set(new GridPosition(4, 2));
-            controller.Tick();
+            TestCharacterSelection.Tick(controller);
             Assert.That(StateOf(controller), Is.EqualTo("Completed"));
             int reads = input.Reads;
             input.NextLevelPressed = true;
             input.RestartPressed = true;
-            controller.Tick(0.75f);
+            TestCharacterSelection.Tick(controller, 0.75f);
             Assert.That(source.Requests, Is.EqualTo(new[] { 0, 1 }));
             Assert.That(StateOf(controller), Is.EqualTo("BindingViews"));
             Assert.That(input.Reads, Is.EqualTo(reads));
@@ -779,18 +779,18 @@ namespace Sokoban.Tests.PlayMode
             controller.Initialize();
             for (int index = 0; index < 2; index++)
             {
-                controller.Tick();
+                TestCharacterSelection.Tick(controller);
                 Assert.That(status.LevelNumber, Is.EqualTo(index + 1));
                 Assert.That(status.LevelCount, Is.EqualTo(2));
                 Assert.That(status.Moves, Is.Zero);
                 input.Move = MoveCommand.Right;
-                controller.Tick();
+                TestCharacterSelection.Tick(controller);
                 input.Move = default;
                 Assert.That(status.Phase, Is.EqualTo(GameplayPhase.Completed));
                 Assert.That(status.Moves, Is.EqualTo(1));
                 Assert.That(status.Results.Count, Is.EqualTo(index + 1));
                 Assert.That(status.Results[index].Moves, Is.EqualTo(1));
-                controller.Tick(0.75f);
+                TestCharacterSelection.Tick(controller, 0.75f);
             }
             Simulation last = SimulationOf(controller);
             Assert.That(status.Phase, Is.EqualTo(GameplayPhase.Finished));
@@ -798,10 +798,9 @@ namespace Sokoban.Tests.PlayMode
             float remaining = status.RemainingSeconds;
             input.Move = MoveCommand.Left;
             input.NextLevelPressed = true;
-            input.NextSkinPressed = true;
-            controller.Tick();
-            input.NextSkinPressed = false;
-            controller.Tick();
+            controller.RequestNextSkin();
+            TestCharacterSelection.Tick(controller);
+            TestCharacterSelection.Tick(controller);
             Assert.That(status.Phase, Is.EqualTo(GameplayPhase.Finished));
             Assert.That(status.Results.Count, Is.EqualTo(2));
             Assert.That(status.RemainingSeconds, Is.EqualTo(remaining));
@@ -810,7 +809,7 @@ namespace Sokoban.Tests.PlayMode
             Assert.That(last.World.Single(entity => entity.Has<PlayerTag>()).Get<ViewSkin>().Id, Is.EqualTo(SkinId.Alternate));
             Assert.That(source.Requests, Is.EqualTo(new[] { 0, 1 }));
             input.RestartPressed = true;
-            controller.Tick();
+            TestCharacterSelection.Tick(controller);
             Assert.That(status.Phase, Is.EqualTo(GameplayPhase.BindingViews));
             Assert.That(status.LevelNumber, Is.EqualTo(1));
             Assert.That(status.Moves, Is.Zero);
@@ -828,16 +827,19 @@ namespace Sokoban.Tests.PlayMode
             var input = new Input();
             using var controller = CreateController(input, source, provider);
             controller.Initialize();
-            controller.Tick();
+            TestCharacterSelection.Tick(controller);
             input.RestartPressed = true;
-            controller.Tick();
+            TestCharacterSelection.Tick(controller);
             input.RestartPressed = false;
             input.NextLevelPressed = true;
-            controller.Tick();
-            controller.Tick();
+            TestCharacterSelection.Tick(controller);
             input.NextLevelPressed = false;
-            controller.Tick();
-            controller.Tick(60f);
+            TestCharacterSelection.Tick(controller);
+            input.NextLevelPressed = true;
+            TestCharacterSelection.Tick(controller);
+            input.NextLevelPressed = false;
+            TestCharacterSelection.Tick(controller);
+            TestCharacterSelection.Tick(controller, 60f);
             Assert.That(controller.Phase, Is.EqualTo(GameplayPhase.BindingViews));
             Assert.That(controller.Results, Is.Empty);
             Assert.That(source.Requests, Is.EqualTo(new[] { 0, 1, 0 }));
@@ -851,21 +853,20 @@ namespace Sokoban.Tests.PlayMode
             var input = new Input();
             using var controller = CreateController(input, new Source(), provider);
             controller.Initialize();
-            controller.Tick(0f);
+            TestCharacterSelection.Tick(controller, 0f);
             Simulation previous = SimulationOf(controller);
             controller.RequestRestart();
             controller.RequestRestart();
             controller.RequestNextSkin();
             controller.RequestNextSkin();
             input.RestartPressed = true;
-            input.NextSkinPressed = true;
-            controller.Tick(0f);
+            controller.RequestNextSkin();
+            TestCharacterSelection.Tick(controller, 0f);
             Simulation replacement = SimulationOf(controller);
             Assert.That(replacement, Is.Not.SameAs(previous));
             Assert.That(replacement.World.Single(e => e.Has<PlayerTag>()).Get<ViewSkin>().Id, Is.EqualTo(SkinId.Alternate));
             input.RestartPressed = false;
-            input.NextSkinPressed = false;
-            controller.Tick(0f);
+            TestCharacterSelection.Tick(controller, 0f);
             Assert.That(SimulationOf(controller), Is.SameAs(replacement));
             Assert.That(controller.Phase, Is.EqualTo(GameplayPhase.Playing));
         }
@@ -883,10 +884,10 @@ namespace Sokoban.Tests.PlayMode
             controller.RequestRestart();
             controller.RequestNextSkin();
             controller.RequestUndo();
-            controller.Tick(0f);
+            TestCharacterSelection.Tick(controller, 0f);
             data.Pending.TrySetResult();
             Simulation initial = SimulationOf(controller);
-            controller.Tick(0f);
+            TestCharacterSelection.Tick(controller, 0f);
             Assert.That(SimulationOf(controller), Is.SameAs(initial));
             Assert.That(source.Requests, Is.EqualTo(new[] { 0 }));
             Assert.That(initial.World.Single(e => e.Has<PlayerTag>()).Get<ViewSkin>().Id, Is.EqualTo(SkinId.Default));
@@ -899,14 +900,14 @@ namespace Sokoban.Tests.PlayMode
             provider.Complete(CreateObject("Prefab"));
             using var controller = CreateController(new Input(), new Source(), provider);
             controller.Initialize();
-            controller.Tick(0f);
+            TestCharacterSelection.Tick(controller, 0f);
             Simulation original = SimulationOf(controller);
             controller.RequestNextSkin();
-            controller.Tick(0f);
+            TestCharacterSelection.Tick(controller, 0f);
             Assert.That(controller.Phase, Is.EqualTo(GameplayPhase.ViewsFailed));
             Assert.That(controller.CanSwitchSkin, Is.True);
             controller.RequestNextSkin();
-            controller.Tick(0f);
+            TestCharacterSelection.Tick(controller, 0f);
             Assert.That(controller.Phase, Is.EqualTo(GameplayPhase.Playing));
             Assert.That(SimulationOf(controller), Is.SameAs(original));
         }
@@ -920,16 +921,16 @@ namespace Sokoban.Tests.PlayMode
             using var controller = CreateController(new Input(), source, provider);
             controller.Initialize();
             CompleteCurrentLevel(controller);
-            controller.Tick(0.75f);
+            TestCharacterSelection.Tick(controller, 0.75f);
             CompleteCurrentLevel(controller);
-            controller.Tick(0.75f);
+            TestCharacterSelection.Tick(controller, 0.75f);
             Assert.That(controller.Phase, Is.EqualTo(GameplayPhase.Finished));
             Assert.That(controller.Results.Count, Is.EqualTo(2));
             controller.RequestNextSkin();
-            controller.Tick(0f);
+            TestCharacterSelection.Tick(controller, 0f);
             Assert.That(controller.Results.Count, Is.EqualTo(2));
             controller.RequestRestart();
-            controller.Tick(0f);
+            TestCharacterSelection.Tick(controller, 0f);
             Assert.That(controller.Results, Is.Empty);
             Assert.That(controller.LevelNumber, Is.EqualTo(1));
             Assert.That(source.Requests, Is.EqualTo(new[] { 0, 1, 0 }));
@@ -943,9 +944,9 @@ namespace Sokoban.Tests.PlayMode
             var input = new Input();
             using var controller = CreateController(input, new Source(), provider, moveDuration: 0.4f);
             controller.Initialize();
-            controller.Tick(0f);
+            TestCharacterSelection.Tick(controller, 0f);
             input.Move = MoveCommand.Right;
-            controller.Tick(0.1f);
+            TestCharacterSelection.Tick(controller, 0.1f);
             Entity player = SimulationOf(controller).World.Single(e => e.Has<PlayerTag>());
             Assert.That(player.Get<ViewMove>().Duration, Is.EqualTo(0.4f));
             Assert.That(player.Get<TransformComponent>().Transform.position.x, Is.EqualTo(2.25f).Within(0.001f));
@@ -959,7 +960,7 @@ namespace Sokoban.Tests.PlayMode
             var source = new Source();
             using var controller = CreateController(new Input(), source, provider, 5f);
             controller.Initialize();
-            controller.Tick(0f);
+            TestCharacterSelection.Tick(controller, 0f);
             Simulation previous = SimulationOf(controller);
             Entity level = previous.World.Single(entity => entity.Has<LevelStateTag>());
             bool disposed = false;
@@ -970,9 +971,9 @@ namespace Sokoban.Tests.PlayMode
             Assert.That(previous.World.Count(entity => entity.Has<TransformComponent>()), Is.EqualTo(visualCount));
             Assert.That(level.Has<GridPosition>() || level.Has<TransformComponent>() || level.Has<ViewPending>()
                 || level.Has<ViewFailed>() || level.Has<ViewSkin>(), Is.False);
-            controller.Tick(1f);
+            TestCharacterSelection.Tick(controller, 1f);
             controller.RequestRestart();
-            controller.Tick(0f);
+            TestCharacterSelection.Tick(controller, 0f);
             Assert.That(disposed, Is.True);
             Simulation fresh = SimulationOf(controller);
             Entity freshLevel = fresh.World.Single(entity => entity.Has<LevelStateTag>());
@@ -993,10 +994,10 @@ namespace Sokoban.Tests.PlayMode
             var input = new Input();
             using var controller = CreateController(input, new Source(), provider);
             controller.Initialize();
-            controller.Tick(0f);
+            TestCharacterSelection.Tick(controller, 0f);
             input.Move = MoveCommand.Right;
-            controller.Tick(0.16f);
-            controller.Tick(0.16f);
+            TestCharacterSelection.Tick(controller, 0.16f);
+            TestCharacterSelection.Tick(controller, 0.16f);
             Simulation simulation = SimulationOf(controller);
             Entity[] entities = simulation.World.ToArray();
             int loads = provider.Requests.Count;
@@ -1005,14 +1006,14 @@ namespace Sokoban.Tests.PlayMode
             controller.RequestUndo();
             input.UndoPressed = true;
             input.Move = MoveCommand.Up;
-            controller.Tick(0.04f);
+            TestCharacterSelection.Tick(controller, 0.04f);
             input.UndoPressed = false;
             input.Move = default;
             Assert.That(controller.Moves, Is.EqualTo(1));
             Assert.That(controller.CanUndo, Is.False);
             Assert.That(simulation.World.Single(e => e.Has<PlayerTag>()).Get<GridPosition>(), Is.EqualTo(new GridPosition(3, 1)));
-            controller.Tick(0.12f);
-            controller.Tick(0f);
+            TestCharacterSelection.Tick(controller, 0.12f);
+            TestCharacterSelection.Tick(controller, 0f);
             Assert.That(controller.Moves, Is.EqualTo(1));
             Assert.That(controller.CanUndo, Is.True);
             Assert.That(SimulationOf(controller), Is.SameAs(simulation));
@@ -1028,24 +1029,24 @@ namespace Sokoban.Tests.PlayMode
             var input = new Input();
             using var controller = CreateController(input, new Source(), provider);
             controller.Initialize();
-            controller.Tick(0f);
+            TestCharacterSelection.Tick(controller, 0f);
             input.Move = MoveCommand.Right;
-            controller.Tick(0.04f);
+            TestCharacterSelection.Tick(controller, 0.04f);
             Assert.That(controller.CanUndo, Is.False);
             controller.RequestUndo();
             input.UndoPressed = true;
             input.Move = MoveCommand.Up;
-            controller.Tick(0.04f);
+            TestCharacterSelection.Tick(controller, 0.04f);
             input.UndoPressed = false;
             input.Move = default;
-            controller.Tick(0.08f);
+            TestCharacterSelection.Tick(controller, 0.08f);
             Assert.That(controller.CanUndo, Is.True);
             Assert.That(controller.Moves, Is.EqualTo(1));
             controller.RequestUndo();
-            controller.Tick(0.04f);
+            TestCharacterSelection.Tick(controller, 0.04f);
             Assert.That(controller.Moves, Is.Zero);
-            controller.Tick(0.12f);
-            controller.Tick(0.16f);
+            TestCharacterSelection.Tick(controller, 0.12f);
+            TestCharacterSelection.Tick(controller, 0.16f);
             Assert.That(SimulationOf(controller).World.Single(e => e.Has<PlayerTag>()).Get<GridPosition>(), Is.EqualTo(new GridPosition(2, 1)));
             Assert.That(controller.Moves, Is.Zero);
             Assert.That(controller.RemainingSeconds, Is.EqualTo(59.52f).Within(0.001f));
@@ -1061,9 +1062,9 @@ namespace Sokoban.Tests.PlayMode
             var input = new Input();
             using var controller = CreateController(input, source, provider);
             controller.Initialize();
-            controller.Tick(0f);
+            TestCharacterSelection.Tick(controller, 0f);
             input.Move = MoveCommand.Right;
-            controller.Tick(0.16f);
+            TestCharacterSelection.Tick(controller, 0.16f);
             input.Move = default;
             Simulation previous = SimulationOf(controller);
             Assert.That(controller.CanUndo, Is.True);
@@ -1071,12 +1072,12 @@ namespace Sokoban.Tests.PlayMode
             input.UndoPressed = true;
             input.NextLevelPressed = next;
             input.RestartPressed = !next;
-            controller.Tick(0f);
+            TestCharacterSelection.Tick(controller, 0f);
             input.UndoPressed = input.NextLevelPressed = input.RestartPressed = false;
             Assert.That(SimulationOf(controller), Is.Not.SameAs(previous));
             Assert.That(controller.Moves, Is.Zero);
             Assert.That(controller.CanUndo, Is.False);
-            controller.Tick(0f);
+            TestCharacterSelection.Tick(controller, 0f);
             Assert.That(controller.CanUndo, Is.False);
             Assert.That(controller.Phase, Is.EqualTo(GameplayPhase.Playing));
             Assert.That(source.Requests, Is.EqualTo(next ? new[] { 0, 1 } : new[] { 0 }));
@@ -1090,35 +1091,34 @@ namespace Sokoban.Tests.PlayMode
             var input = new Input();
             using var controller = CreateController(input, new Source(), provider);
             controller.Initialize();
-            controller.Tick(0f);
+            TestCharacterSelection.Tick(controller, 0f);
             input.Move = MoveCommand.Right;
-            controller.Tick(0.16f);
+            TestCharacterSelection.Tick(controller, 0.16f);
             input.Move = default;
             Assert.That(controller.CanUndo, Is.True);
             provider.Reset();
-            input.NextSkinPressed = true;
-            controller.Tick(0f);
-            input.NextSkinPressed = false;
+            controller.RequestNextSkin();
+            TestCharacterSelection.Tick(controller, 0f);
             Assert.That(controller.CanUndo, Is.False);
             controller.RequestUndo();
             input.UndoPressed = true;
-            controller.Tick(0.25f);
+            TestCharacterSelection.Tick(controller, 0.25f);
             input.UndoPressed = false;
             provider.Complete(CreateObject("New skin"));
-            controller.Tick(0f);
+            TestCharacterSelection.Tick(controller, 0f);
             Assert.That(controller.Moves, Is.EqualTo(1));
             Assert.That(controller.CanUndo, Is.True);
             controller.RequestUndo();
-            controller.Tick(0.16f);
+            TestCharacterSelection.Tick(controller, 0.16f);
             Assert.That(controller.Moves, Is.Zero);
         }
 
         private static void CompleteCurrentLevel(GameplayController controller)
         {
-            controller.Tick(0f);
+            TestCharacterSelection.Tick(controller, 0f);
             Simulation simulation = SimulationOf(controller);
             simulation.World.Single(e => e.Has<BoxTag>()).Set(new GridPosition(4, 2));
-            controller.Tick(0f);
+            TestCharacterSelection.Tick(controller, 0f);
             Assert.That(controller.Phase, Is.EqualTo(GameplayPhase.Completed));
         }
 
@@ -1144,7 +1144,7 @@ namespace Sokoban.Tests.PlayMode
             public MoveCommand Move { get; set; }
             public bool RestartPressed { get; set; }
             public bool NextLevelPressed { get; set; }
-            public bool NextSkinPressed { get; set; }
+            public bool IsNeutral => true;
             public MoveCommand ReadMove()
             {
                 Reads++;

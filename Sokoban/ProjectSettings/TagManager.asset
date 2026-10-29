@@ -35,7 +35,7 @@ TagManager:
   - 
   - 
   - 
-  - 
+  - BackgroundLighting
   - 
   m_SortingLayers:
   - name: Default

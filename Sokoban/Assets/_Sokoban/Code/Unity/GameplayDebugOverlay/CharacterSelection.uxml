@@ -1,0 +1,23 @@
+<ui:UXML xmlns:ui="UnityEngine.UIElements" xmlns:presentation="Sokoban.Presentation">
+    <ui:Style src="GameplayOverlay.uss" />
+    <ui:Template name="characterChoice" src="CharacterChoice.uxml" />
+    <ui:VisualElement name="characterSelection" class="selection-layer">
+        <ui:VisualElement name="selectionWindow" class="selection-window">
+            <ui:Label text="BEFORE YOU BEGIN" class="eyebrow" picking-mode="Ignore" />
+            <ui:Label text="Choose your player" class="selection-title" picking-mode="Ignore" />
+            <ui:Label text="Same puzzle. Your character." class="selection-subtitle" picking-mode="Ignore" />
+            <ui:ScrollView name="characterScroll" class="selection-scroll" mode="Vertical" horizontal-scroller-visibility="Hidden" vertical-scroller-visibility="Auto">
+                <ui:VisualElement name="characterChoices" class="character-choices" picking-mode="Ignore" />
+            </ui:ScrollView>
+            <ui:Label name="characterFeedback" class="selection-feedback" picking-mode="Ignore" />
+            <ui:Button name="confirmCharacter" text="Start" class="action primary selection-confirm" />
+            <ui:Label text="Arrows: browse / Tab: focus / Enter or Space: select" class="selection-help" picking-mode="Ignore" />
+        </ui:VisualElement>
+        <ui:VisualElement name="characterPortraits" class="hidden" picking-mode="Ignore">
+            <presentation:CharacterPortrait skin="Default" portrait="project://database/Assets/_Sokoban/Art/UI/Portraits/Default.png" />
+            <presentation:CharacterPortrait skin="Alternate" portrait="project://database/Assets/_Sokoban/Art/UI/Portraits/Alternate.png" />
+            <presentation:CharacterPortrait skin="Punk" portrait="project://database/Assets/_Sokoban/Art/UI/Portraits/Punk.png" />
+        </ui:VisualElement>
+        <ui:Instance template="characterChoice" name="characterChoiceTemplate" class="hidden" picking-mode="Ignore" />
+    </ui:VisualElement>
+</ui:UXML>

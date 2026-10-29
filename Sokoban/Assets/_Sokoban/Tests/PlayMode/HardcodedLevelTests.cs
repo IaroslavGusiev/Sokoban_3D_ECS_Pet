@@ -19,6 +19,7 @@ using UnityEngine.InputSystem;
 using UnityEngine.InputSystem.LowLevel;
 using UnityEngine.SceneManagement;
 using UnityEngine.TestTools;
+using UnityEngine.UIElements;
 using Zenject;
 
 namespace Sokoban.Tests.PlayMode
@@ -76,6 +77,11 @@ namespace Sokoban.Tests.PlayMode
             Assert.That(context.Container.HasBinding<HintArrow>(), Is.False);
             _levelRoot = context.Container.Resolve<LevelRoot>().Transform;
             float deadline = Time.realtimeSinceStartup + 10f;
+            while (_controller.Phase != GameplayPhase.SelectingCharacter && Time.realtimeSinceStartup < deadline) yield return null;
+            Assert.That(_controller.Phase, Is.EqualTo(GameplayPhase.SelectingCharacter));
+            Assert.That(CurrentSimulation.World.Single(e => e.Has<PlayerTag>()).Has<TransformComponent>(), Is.False);
+            Assert.That(Board.childCount, Is.EqualTo(75));
+            _controller.RequestConfirmCharacter();
             while (_controller.Phase != GameplayPhase.Playing && Time.realtimeSinceStartup < deadline) yield return null;
             Assert.That(CurrentSimulation, Is.Not.Null, "Initial Addressable content did not load within 10 seconds.");
             _catalog = context.Container.Resolve<IStaticDataProvider>().GetViewCatalog();
@@ -98,6 +104,9 @@ namespace Sokoban.Tests.PlayMode
         [UnityTest]
         public IEnumerator KeyboardSolution_SynchronizesActorsAndPreservesGoalFloors()
         {
+            UIDocument document = _scene.GetRootGameObjects()
+                .SelectMany(root => root.GetComponentsInChildren<UIDocument>()).Single();
+            document.rootVisualElement.Q<Button>("restart").Focus();
             Transform firstGoal = View("Goal (2, 4)");
             Transform secondGoal = View("Goal (4, 4)");
             Material goalMaterial = firstGoal.GetComponentInChildren<Renderer>().sharedMaterial;
@@ -347,24 +356,33 @@ namespace Sokoban.Tests.PlayMode
         }
 
         [UnityTest]
-        public IEnumerator OverlayCommands_SwitchSkinAndRestartThroughTheSceneBinding()
+        public IEnumerator InternalSkinReplacementAndOverlayRestartUseTheSceneBinding()
         {
-            SceneContext context = _scene.GetRootGameObjects().Select(root => root.GetComponent<SceneContext>())
-                .Single(component => component != null);
-            IGameplayCommands commands = context.Container.Resolve<IGameplayCommands>();
+            yield return null;
+            UIDocument document = _scene.GetRootGameObjects()
+                .SelectMany(root => root.GetComponentsInChildren<UIDocument>()).Single();
             Simulation original = CurrentSimulation;
             Entity player = original.World.Single(e => e.Has<PlayerTag>());
-            commands.RequestNextSkin();
+            _controller.RequestNextSkin();
+            _controller.RequestNextSkin();
             float deadline = Time.realtimeSinceStartup + 5f;
             while ((!player.Has<PlayerAnimatorComponent>() || player.Get<ViewSkin>().Id != SkinId.Alternate)
                    && Time.realtimeSinceStartup < deadline) yield return null;
             Assert.That(player.Get<ViewSkin>().Id, Is.EqualTo(SkinId.Alternate));
             Assert.That(player.Has<PlayerAnimatorComponent>(), Is.True);
             Assert.That(CurrentSimulation, Is.SameAs(original));
-            commands.RequestRestart();
+            Activate(document.rootVisualElement.Q<Button>("restart"));
+            Activate(document.rootVisualElement.Q<Button>("restart"));
             while (CurrentSimulation == original && Time.realtimeSinceStartup < deadline) yield return null;
             Assert.That(CurrentSimulation, Is.Not.SameAs(original));
             Assert.That(CurrentSimulation.World.Single(e => e.Has<PlayerTag>()).Get<ViewSkin>().Id, Is.EqualTo(SkinId.Alternate));
+        }
+
+        private static void Activate(VisualElement target)
+        {
+            using var evt = NavigationSubmitEvent.GetPooled();
+            evt.target = target;
+            target.SendEvent(evt);
         }
 
         [UnityTest]
@@ -374,7 +392,11 @@ namespace Sokoban.Tests.PlayMode
             Entity player = simulation.World.Single(entity => entity.Has<PlayerTag>());
             foreach (SkinId skin in new[] { SkinId.Default, SkinId.Alternate, SkinId.Punk, SkinId.Default })
             {
-                if (player.Get<ViewSkin>().Id != skin) yield return Press(Key.K);
+                if (player.Get<ViewSkin>().Id != skin)
+                {
+                    _controller.RequestNextSkin();
+                    yield return null;
+                }
                 float deadline = Time.realtimeSinceStartup + 5f;
                 while (!player.Has<PlayerAnimatorComponent>() && Time.realtimeSinceStartup < deadline) yield return null;
                 Assert.That(player.Get<ViewSkin>().Id, Is.EqualTo(skin));
@@ -383,6 +405,45 @@ namespace Sokoban.Tests.PlayMode
                 Assert.That(CurrentSimulation, Is.SameAs(simulation));
                 Assert.That(player.Has<ViewMove>(), Is.False);
             }
+        }
+
+        [UnityTest]
+        public IEnumerator SelectionUiUsesKeyboardWithoutLeakingGameplayShortcuts()
+        {
+            yield return Press(Key.N);
+            float deadline = Time.realtimeSinceStartup + 10f;
+            while (_controller.Phase != GameplayPhase.SelectingCharacter && Time.realtimeSinceStartup < deadline)
+            {
+                yield return null;
+            }
+            Assert.That(_controller.Phase, Is.EqualTo(GameplayPhase.SelectingCharacter));
+            Simulation simulation = CurrentSimulation;
+            Entity player = simulation.World.Single(e => e.Has<PlayerTag>());
+            GameplaySnapshot before = simulation.CaptureSnapshot();
+            yield return Press(Key.R);
+            yield return Press(Key.Z);
+            yield return Press(Key.K);
+            Assert.That(CurrentSimulation, Is.SameAs(simulation));
+            Assert.That(simulation.CaptureSnapshot(), Is.EqualTo(before));
+            Assert.That(player.Has<TransformComponent>(), Is.False);
+            yield return Press(Key.RightArrow);
+            yield return Press(Key.Enter);
+            Assert.That(_controller.SelectedCharacter, Is.EqualTo(SkinId.Alternate));
+            yield return Press(Key.Tab);
+            yield return Press(Key.Tab);
+            yield return Press(Key.Enter);
+            while (_controller.Phase != GameplayPhase.Playing && Time.realtimeSinceStartup < deadline)
+            {
+                yield return null;
+            }
+            Assert.That(_controller.Phase, Is.EqualTo(GameplayPhase.Playing));
+            Assert.That(player.Get<ViewSkin>().Id, Is.EqualTo(SkinId.Alternate));
+            Assert.That(player.Has<PlayerAnimatorComponent>(), Is.True);
+            Assert.That(_controller.Moves, Is.Zero);
+            Transform view = player.Get<TransformComponent>().Transform;
+            yield return Press(Key.K);
+            Assert.That(player.Get<TransformComponent>().Transform, Is.SameAs(view));
+            Assert.That(player.Get<ViewSkin>().Id, Is.EqualTo(SkinId.Alternate));
         }
 
         [UnityTest]

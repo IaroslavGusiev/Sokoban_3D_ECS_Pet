@@ -31,6 +31,24 @@ namespace Sokoban.Editor
                     ValidateAddress(skin.Address, typeof(GameObject), entries, $"{path}: {new ViewKey(kind.Kind, skin.Skin)}");
                 }
             }
+            foreach (string guid in AssetDatabase.FindAssets("t:BackgroundCatalog"))
+            {
+                string path = AssetDatabase.GUIDToAssetPath(guid);
+                BackgroundCatalog catalog = AssetDatabase.LoadAssetAtPath<BackgroundCatalog>(path);
+                if (catalog.Presets.Count == 0)
+                {
+                    throw new InvalidOperationException($"{path}: add at least one background preset.");
+                }
+                foreach (BackgroundPreset preset in catalog.Presets)
+                {
+                    ValidateAddress(preset.Address, typeof(Cubemap), entries, $"{path}: {preset.Name}");
+                    if (float.IsNaN(preset.RotationDegrees) || float.IsInfinity(preset.RotationDegrees)
+                        || float.IsNaN(preset.Exposure) || float.IsInfinity(preset.Exposure))
+                    {
+                        throw new InvalidOperationException($"{path}: {preset.Name} has nonfinite background metadata.");
+                    }
+                }
+            }
             foreach (string guid in AssetDatabase.FindAssets("t:LevelList"))
             {
                 string path = AssetDatabase.GUIDToAssetPath(guid);
@@ -66,7 +84,7 @@ namespace Sokoban.Editor
         public static void ValidateConfigs(IEnumerable<AddressableAssetEntry> entries)
         {
             AddressableAssetEntry[] all = entries.ToArray();
-            foreach (Type type in new[] { typeof(GameplaySettings), typeof(LevelList), typeof(ViewCatalog) })
+            foreach (Type type in new[] { typeof(GameplaySettings), typeof(LevelList), typeof(ViewCatalog), typeof(BackgroundCatalog) })
             {
                 AddressableAssetEntry[] matches = all.Where(entry => entry.labels.Contains(StaticDataProvider.ConfigLabel)
                     && type.IsAssignableFrom(AssetDatabase.GetMainAssetTypeAtPath(entry.AssetPath))).ToArray();
