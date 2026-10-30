@@ -898,10 +898,6 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: fc7c2dbf773748a68f7fd3c544ca2b35, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  levelRoot: {fileID: 643343495}
-  gameplayCamera: {fileID: 479738323}
-  backgroundVolume: {fileID: 1264425416}
-  backgroundShader: {fileID: 4800000, guid: 9581c7608ad1eb54bba41673ca967cec, type: 3}
 --- !u!114 &2140444732
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -962,6 +958,10 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: fd70ac01d36d7934082ba660484abd33, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
+  levelRoot: {fileID: 643343495}
+  gameplayCamera: {fileID: 479738323}
+  backgroundVolume: {fileID: 1264425416}
+  backgroundShader: {fileID: 4800000, guid: 9581c7608ad1eb54bba41673ca967cec, type: 3}
 --- !u!1660057539 &9223372036854775807
 SceneRoots:
   m_ObjectHideFlags: 0

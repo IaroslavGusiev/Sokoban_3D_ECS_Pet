@@ -8,26 +8,28 @@ namespace Sokoban.Presentation
     {
         private readonly IGameplayStatus _status;
 
+        private readonly Label _hintTitle;
         private readonly Label _phaseDetail;
         private readonly Label _hintMessage;
-        private readonly Label _hintTitle;
-        private readonly ButtonBinding _restart;
-        private readonly ButtonBinding _undo;
         private readonly ButtonBinding _hint;
+        private readonly ButtonBinding _undo;
+        private readonly ButtonBinding _restart;
 
-        private GameplayPhase? _shownPhase;
         private HintStatus? _shownHint;
+        private GameplayPhase? _shownPhase;
         private MoveCommand _shownHintMove;
 
         public GameplayControlsView(VisualElement root, IGameplayStatus status, IGameplayCommands commands)
         {
             _status = status;
-            _phaseDetail = UiElements.Require<Label>(root, UiIds.Controls.PhaseDetail);
-            _hintMessage = UiElements.Require<Label>(root, UiIds.Controls.HintMessage);
+
             _hintTitle = UiElements.Require<Label>(root, UiIds.Controls.HintTitle);
-            Button restart = UiElements.Require<Button>(root, UiIds.Controls.Restart);
-            Button undo = UiElements.Require<Button>(root, UiIds.Controls.Undo);
-            Button hint = UiElements.Require<Button>(root, UiIds.Controls.Hint);
+            _hintMessage = UiElements.Require<Label>(root, UiIds.Controls.HintMessage);
+            _phaseDetail = UiElements.Require<Label>(root, UiIds.Controls.PhaseDetail);
+
+            var undo = UiElements.Require<Button>(root, UiIds.Controls.Undo);
+            var hint = UiElements.Require<Button>(root, UiIds.Controls.Hint);
+            var restart = UiElements.Require<Button>(root, UiIds.Controls.Restart);
 
             _restart = new ButtonBinding(restart, () => commands.CanRestart, commands.RequestRestart);
             _undo = new ButtonBinding(undo, () => commands.CanUndo, commands.RequestUndo);
@@ -64,7 +66,11 @@ namespace Sokoban.Presentation
 
             _shownHint = _status.HintStatus;
             _shownHintMove = _status.HintMove;
-            _hintTitle.text = _status.HintStatus == HintStatus.Calculating ? "Calculating…" : "Hint";
+            
+            _hintTitle.text = _status.HintStatus == HintStatus.Calculating 
+                ? "Calculating…"
+                : "Hint";
+            
             _hintMessage.text = _status.HintStatus switch
             {
                 HintStatus.Calculating => "Finding a shortest move…",
@@ -75,16 +81,19 @@ namespace Sokoban.Presentation
                 HintStatus.AlreadySolved => "Already solved",
                 _ => ""
             };
+            
             UiElements.SetVisible(_hintMessage, _hintMessage.text.Length > 0);
         }
 
         private void RefreshPhaseDetail()
         {
-            if (_shownPhase != _status.Phase)
+            if (_shownPhase == _status.Phase)
             {
-                _shownPhase = _status.Phase;
-                _phaseDetail.text = $"Phase: {_status.Phase}";
+                return;
             }
+            
+            _shownPhase = _status.Phase;
+            _phaseDetail.text = $"Phase: {_status.Phase}";
 
         }
 

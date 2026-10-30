@@ -8,12 +8,16 @@ namespace Sokoban.Presentation
         public static T Require<T>(VisualElement scope, string name) where T : VisualElement
         {
             VisualElement element = scope.Q(name);
+            
             if (element is T match)
             {
                 return match;
             }
 
-            string actual = element == null ? "missing" : element.GetType().Name;
+            string actual = element == null 
+                ? "missing" 
+                : element.GetType().Name;
+            
             throw new InvalidOperationException($"UI element '{name}' must be {typeof(T).Name}; found {actual} in '{scope.name}'.");
         }
 

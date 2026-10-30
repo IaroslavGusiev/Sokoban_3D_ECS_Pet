@@ -36,6 +36,37 @@ namespace Sokoban.CoreTests
         }
 
         [Test]
+        public void PlayerPosition_TracksCommittedMovesAndUndoWithoutChangingStateOrRecording()
+        {
+            using var simulation = new Simulation(LevelParser.Parse("#######\n#@-$-.#\n#######"), new LevelPopulator(), 60f, new SimulationPipelineFactory());
+            AssertPosition(new GridPosition(1, 1));
+            simulation.Send(MoveCommand.Right);
+            AssertPosition(new GridPosition(1, 1));
+            simulation.Tick(0f);
+            AssertPosition(new GridPosition(2, 1));
+            simulation.Send(MoveCommand.Right);
+            simulation.Tick(0f);
+            AssertPosition(new GridPosition(3, 1));
+            Assert.That(simulation.RequestUndo(), Is.True);
+            AssertPosition(new GridPosition(3, 1));
+            simulation.Tick(0f);
+            AssertPosition(new GridPosition(2, 1));
+            Assert.That(simulation.RequestUndo(), Is.True);
+            simulation.Tick(0f);
+            AssertPosition(new GridPosition(1, 1));
+
+            void AssertPosition(GridPosition expected)
+            {
+                GameplaySnapshot before = simulation.CaptureSnapshot();
+                SimulationRecording recording = simulation.ExportRecording();
+                Assert.That(simulation.PlayerPosition, Is.EqualTo(expected));
+                Assert.That(simulation.PlayerPosition, Is.EqualTo(before.PlayerPosition));
+                Assert.That(simulation.CaptureSnapshot(), Is.EqualTo(before));
+                Assert.That(simulation.ExportRecording().Inputs, Is.EqualTo(recording.Inputs));
+            }
+        }
+
+        [Test]
         public void RejectedOverflowInvalidAndIdleInputs_DoNotAdvanceRevision()
         {
             var level = new LevelDefinition(3, 3, new GridPosition(int.MaxValue, 1), Array.Empty<GridPosition>(),

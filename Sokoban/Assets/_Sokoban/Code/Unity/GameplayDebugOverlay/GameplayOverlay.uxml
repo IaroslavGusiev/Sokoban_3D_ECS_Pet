@@ -23,7 +23,7 @@
         <ui:VisualElement name="completed" picking-mode="Ignore" class="completion-toast">
             <ui:Label text="Solved" picking-mode="Ignore" class="success-title" />
             <ui:Label name="completedStats" picking-mode="Ignore" class="completion-stats" />
-            <ui:Label text="ContinuingвЂ¦" picking-mode="Ignore" class="muted" />
+            <ui:Label text="Continuing…" picking-mode="Ignore" class="muted" />
         </ui:VisualElement>
         <ui:ScrollView name="controlsScroll" mode="Vertical" horizontal-scroller-visibility="Hidden" vertical-scroller-visibility="Auto" class="side controls-side">
             <ui:VisualElement name="controlsPanel" class="controls-panel">

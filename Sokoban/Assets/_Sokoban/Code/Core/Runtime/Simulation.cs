@@ -9,28 +9,43 @@ namespace Sokoban.Core
 {
     public sealed class Simulation : IDisposable
     {
+        private readonly LevelDefinition _initialLevel;
+
         private readonly Entity _player;
         private readonly Entity _levelState;
         private readonly SystemPipeline _pipeline;
         private readonly MoveHistory _history = new();
         
-        private readonly float _timeLimitSeconds;
-        private readonly LevelDefinition _initialLevel;
         private List<SimulationInput> _inputs;
+
+        private readonly float _timeLimitSeconds;
 
         public World World { get; }
 
-        public bool IsTimedOut => _levelState.Has<LevelTimedOutTag>();
+        public bool IsCompleted =>
+            _levelState.Has<LevelCompletedTag>();
 
-        public bool IsCompleted => _levelState.Has<LevelCompletedTag>();
+        public bool IsTimedOut =>
+            _levelState.Has<LevelTimedOutTag>();
 
-        public bool CanUndo => IsCompleted == false && IsTimedOut == false && _history.Entries.Count > 0;
+        public float RemainingSeconds =>
+            _levelState.Get<LevelTimer>().RemainingSeconds;
 
-        public long BoardRevision => _levelState.Get<BoardRevision>().Value;
+        public LevelResult Result =>
+            new(_levelState.Get<MoveCount>().Value,
+                _timeLimitSeconds - RemainingSeconds,
+                RemainingSeconds);
 
-        public float RemainingSeconds => _levelState.Get<LevelTimer>().RemainingSeconds;
-        
-        public LevelResult Result => new(_levelState.Get<MoveCount>().Value, _timeLimitSeconds - RemainingSeconds, RemainingSeconds);
+        public GridPosition PlayerPosition =>
+            _player.Get<GridPosition>();
+
+        public long BoardRevision =>
+            _levelState.Get<BoardRevision>().Value;
+
+        public bool CanUndo =>
+            IsCompleted == false
+            && IsTimedOut == false
+            && _history.Entries.Count > 0;
 
         public Simulation(LevelDefinition level, LevelPopulator populator, float timeLimitSeconds, SimulationPipelineFactory pipelineFactory)
             : this(level, populator, timeLimitSeconds, pipelineFactory.Create, recordInputs: true) { }
@@ -77,8 +92,10 @@ namespace Sokoban.Core
             finally
             {
                 _history.Entries.Clear();
+                
                 _inputs?.Clear();
                 _inputs = null;
+                
                 World.Dispose();
             }
         }
@@ -128,7 +145,7 @@ namespace Sokoban.Core
 
         public GameplaySnapshot CaptureSnapshot()
         {
-            var playerPosition = _player.Get<GridPosition>();
+            GridPosition playerPosition = PlayerPosition;
 
             IEnumerable<GridPosition> positions = World
                 .Where(entity => entity.Has<BoxTag>())

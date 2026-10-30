@@ -7,35 +7,55 @@ namespace Sokoban.Presentation
 {
     internal sealed class LevelRun : IDisposable
     {
-        private readonly ViewLayer _viewLayer;
-        private readonly Simulation _simulation;
         private readonly LevelDefinition _level;
+
+        private readonly Simulation _simulation;
+        private readonly ViewLayer _viewLayer;
 
         private MoveCommand _bufferedMove;
 
-        public bool HasBoardFailure => _viewLayer.HasBoardFailure;
+        public bool IsCompleted =>
+            _simulation.IsCompleted;
 
-        public bool HasPlayerFailure => _viewLayer.HasPlayerFailure;
+        public bool IsTimedOut =>
+            _simulation.IsTimedOut;
 
-        public bool IsPlayerDeferred => _viewLayer.IsPlayerDeferred;
+        public float RemainingSeconds =>
+            _simulation.RemainingSeconds;
 
-        public ViewStatus ViewStatus => _viewLayer.Status;
-        
-        public bool IsCompleted => _simulation.IsCompleted;
-        
-        public bool IsTimedOut => _simulation.IsTimedOut;
-        
-        public float RemainingSeconds => _simulation.RemainingSeconds;
-        
-        public LevelResult Result => _simulation.Result;
+        public LevelResult Result =>
+            _simulation.Result;
 
-        public bool CanUndo => ViewStatus == ViewStatus.Ready && IsPlayerDeferred == false && _viewLayer.IsMoving == false && _simulation.CanUndo;
+        public long BoardRevision =>
+            _simulation.BoardRevision;
 
-        public bool CanHint => ViewStatus == ViewStatus.Ready && IsPlayerDeferred == false && _viewLayer.IsMoving == false && IsCompleted == false && IsTimedOut == false;
-        
-        public long BoardRevision => _simulation.BoardRevision;
-        
-        public bool HasHintArrow => _viewLayer.HasHintArrow;
+        public ViewStatus ViewStatus =>
+            _viewLayer.Status;
+
+        public bool HasBoardFailure =>
+            _viewLayer.HasBoardFailure;
+
+        public bool HasPlayerFailure =>
+            _viewLayer.HasPlayerFailure;
+
+        public bool IsPlayerDeferred =>
+            _viewLayer.IsPlayerDeferred;
+
+        public bool HasHintArrow =>
+            _viewLayer.HasHintArrow;
+
+        public bool CanUndo =>
+            HasReadyStationaryViews && _simulation.CanUndo;
+
+        public bool CanHint =>
+            HasReadyStationaryViews
+            && IsCompleted == false
+            && IsTimedOut == false;
+
+        private bool HasReadyStationaryViews =>
+            ViewStatus == ViewStatus.Ready
+            && IsPlayerDeferred == false
+            && _viewLayer.IsMoving == false;
 
         public LevelRun(LevelRoot root, LevelDefinition level, IViewProvider provider, LevelPopulator populator,
             SimulationPipelineFactory simulationPipelineFactory, ViewPipelineFactory viewPipelineFactory, RunOptions options)
@@ -110,7 +130,7 @@ namespace Sokoban.Presentation
         }
 
         public void ShowHint(GameObject prefab, MoveCommand move) =>
-            _viewLayer.ShowHint(prefab, _simulation.CaptureSnapshot().PlayerPosition, move);
+            _viewLayer.ShowHint(prefab, _simulation.PlayerPosition, move);
 
         public void HideHint() =>
             _viewLayer.HideHint();

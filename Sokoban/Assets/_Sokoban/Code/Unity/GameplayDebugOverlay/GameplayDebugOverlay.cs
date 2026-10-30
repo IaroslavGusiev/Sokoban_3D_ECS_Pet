@@ -18,6 +18,7 @@ namespace Sokoban.Presentation
         {
             _view?.Dispose();
             _view = null;
+            
             _status = status;
             _commands = commands;
 
@@ -61,7 +62,7 @@ namespace Sokoban.Presentation
                 _view = null;
             }
 
-            if (root == null || root.Q(UiIds.Root.Name) == null)
+            if (root?.Q(UiIds.Root.Name) == null)
             {
                 return;
             }

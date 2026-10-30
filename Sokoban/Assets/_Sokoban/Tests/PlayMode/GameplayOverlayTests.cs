@@ -713,6 +713,18 @@ namespace Sokoban.Tests.PlayMode
                 (Phase: GameplayPhase.CharacterFailed, Class: UiIds.Phases.CharacterFailed, Notice: "",
                     Hud: false, Selection: true, Completed: false, Results: false, CompactTop: 164f)
             };
+            var coveredPhases = new List<GameplayPhase>();
+            var coveredClasses = new List<string>();
+            foreach (var expected in cases)
+            {
+                coveredPhases.Add(expected.Phase);
+                coveredClasses.Add(expected.Class);
+            }
+            Assert.That(coveredPhases, Is.Unique, "The phase case table contains duplicate phases.");
+            Assert.That(coveredPhases, Is.EquivalentTo(System.Enum.GetValues(typeof(GameplayPhase))),
+                "The phase case table must cover every GameplayPhase value; add a case when the enum changes.");
+            Assert.That(coveredClasses, Is.Unique, "Every phase case must have a unique phase class.");
+
             foreach (bool rebind in new[] { false, true })
             {
                 foreach (var expected in cases)
@@ -755,6 +767,29 @@ namespace Sokoban.Tests.PlayMode
             {
                 Assert.That(Root.Q(name).resolvedStyle.display,
                     Is.EqualTo(visible ? DisplayStyle.Flex : DisplayStyle.None), $"{_model.Phase}: {name}");
+            }
+        }
+
+        [Test]
+        public void UnsupportedPhaseThrowsWithoutChangingTheOwnedPhaseClass()
+        {
+            VisualElement tree = AssetDatabase.LoadAssetAtPath<VisualTreeAsset>(Assets + "GameplayOverlay.uxml").CloneTree();
+            using var view = new GameplayOverlayView(tree, _model, _model);
+            view.Refresh();
+            var unsupported = (GameplayPhase)int.MaxValue;
+            _model.Phase = unsupported;
+            try
+            {
+                var error = Assert.Throws<System.ArgumentOutOfRangeException>(() => view.Refresh());
+                Assert.That(error.ParamName, Is.EqualTo("phase"));
+                Assert.That(error.ActualValue, Is.EqualTo(unsupported));
+                Assert.That(error.Message, Does.Contain("Unsupported gameplay phase"));
+                Assert.That(tree.ClassListContains(UiIds.Phases.Playing), Is.True,
+                    "A rejected phase must not corrupt the cached class or disposal state.");
+            }
+            finally
+            {
+                _model.Phase = GameplayPhase.Playing;
             }
         }
 

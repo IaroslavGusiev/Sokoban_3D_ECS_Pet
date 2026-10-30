@@ -12,12 +12,15 @@ using Sokoban.Core.Commands;
 using Sokoban.Presentation;
 using Sokoban.Core;
 using Sokoban.Presentation.Ecs.Components;
+using UnityEditor;
 using UnityEditor.SceneManagement;
 using UnityEngine;
 using UnityEngine.AddressableAssets;
 using UnityEngine.InputSystem;
 using UnityEngine.InputSystem.LowLevel;
 using UnityEngine.SceneManagement;
+using UnityEngine.Rendering;
+using UnityEngine.Rendering.HighDefinition;
 using UnityEngine.TestTools;
 using UnityEngine.UIElements;
 using Zenject;
@@ -74,6 +77,15 @@ namespace Sokoban.Tests.PlayMode
             Assert.That(disposables.OfType<ViewAssets>(), Is.Empty);
             Assert.That(disposables.OfType<StaticDataProvider>(), Is.Empty);
             Assert.That(disposables.OfType<HintCoordinator>(), Is.Empty);
+            Assert.That(disposables.OfType<BackgroundCoordinator>(), Is.Empty);
+            Assert.That(disposables.OfType<BackgroundDisplay>(), Is.Empty);
+            Assert.That(context.Container.Resolve<BackgroundCoordinator>(),
+                Is.SameAs(context.Container.Resolve<BackgroundCoordinator>()));
+            Assert.That(context.Container.Resolve<BackgroundDisplay>(),
+                Is.SameAs(context.Container.Resolve<BackgroundDisplay>()));
+            Assert.That(context.Container.HasBinding<Camera>(), Is.False);
+            Assert.That(context.Container.HasBinding<Volume>(), Is.False);
+            Assert.That(context.Container.HasBinding<Shader>(), Is.False);
             Assert.That(context.Container.HasBinding<HintArrow>(), Is.False);
             _levelRoot = context.Container.Resolve<LevelRoot>().Transform;
             float deadline = Time.realtimeSinceStartup + 10f;
@@ -99,6 +111,57 @@ namespace Sokoban.Tests.PlayMode
             if (_keyboard != null && _keyboard.added) InputSystem.RemoveDevice(_keyboard);
             InputSystem.settings.editorInputBehaviorInPlayMode = _editorInput;
             InputSystem.settings.backgroundBehavior = _backgroundInput;
+        }
+
+        [UnityTest]
+        public IEnumerator GameplayInstaller_ComposesSavedReferencesAndKeepsOneDisplayAcrossRestart()
+        {
+            SceneContext context = _scene.GetRootGameObjects().Select(root => root.GetComponent<SceneContext>())
+                .Single(component => component != null);
+            var sceneBindings = new SerializedObject(context.GetComponent<GameplayInstaller>());
+            var services = new SerializedObject(context.GetComponent<ServicesInstaller>());
+            foreach (string field in new[] { "levelRoot", "gameplayCamera", "backgroundVolume", "backgroundShader" })
+            {
+                Assert.That(sceneBindings.FindProperty(field).objectReferenceValue, Is.Not.Null, field);
+                Assert.That(services.FindProperty(field), Is.Null, "Obsolete service scene reference: " + field);
+            }
+            Assert.That(sceneBindings.FindProperty("levelRoot").objectReferenceValue, Is.SameAs(_levelRoot));
+            var camera = (Camera)sceneBindings.FindProperty("gameplayCamera").objectReferenceValue;
+            var volume = (Volume)sceneBindings.FindProperty("backgroundVolume").objectReferenceValue;
+            var shader = (Shader)sceneBindings.FindProperty("backgroundShader").objectReferenceValue;
+            CustomPassVolume projection = volume.GetComponents<CustomPassVolume>().Single();
+            Assert.That(projection.targetCamera, Is.SameAs(camera));
+            var pass = (FullScreenCustomPass)projection.customPasses.Single();
+            Assert.That(pass.fullscreenPassMaterial.shader, Is.SameAs(shader));
+            float deadline = Time.realtimeSinceStartup + 10f;
+            while (_controller.BackgroundStatus != BackgroundStatus.Ready && Time.realtimeSinceStartup < deadline)
+            {
+                yield return null;
+            }
+            Assert.That(_controller.BackgroundStatus, Is.EqualTo(BackgroundStatus.Ready));
+            string initial = _controller.BackgroundName;
+            _controller.RequestNextBackground();
+            while ((_controller.BackgroundName == initial || _controller.BackgroundStatus != BackgroundStatus.Ready)
+                   && Time.realtimeSinceStartup < deadline)
+            {
+                yield return null;
+            }
+            Assert.That(_controller.BackgroundName, Is.Not.EqualTo(initial));
+            Assert.That(_controller.BackgroundStatus, Is.EqualTo(BackgroundStatus.Ready));
+            string selected = _controller.BackgroundName;
+            Texture texture = pass.fullscreenPassMaterial.GetTexture("_BackgroundCube");
+            Assert.That(texture, Is.Not.Null);
+            Transform oldBoard = Board;
+            _controller.RequestRestart();
+            while ((Board == oldBoard || _controller.Phase != GameplayPhase.Playing) && Time.realtimeSinceStartup < deadline)
+            {
+                yield return null;
+            }
+            Assert.That(Board, Is.Not.SameAs(oldBoard));
+            Assert.That(_controller.Phase, Is.EqualTo(GameplayPhase.Playing));
+            Assert.That(_controller.BackgroundName, Is.EqualTo(selected));
+            Assert.That(pass.fullscreenPassMaterial.GetTexture("_BackgroundCube"), Is.SameAs(texture));
+            Assert.That(volume.GetComponents<CustomPassVolume>().Single(), Is.SameAs(projection));
         }
 
         [UnityTest]
@@ -188,17 +251,29 @@ namespace Sokoban.Tests.PlayMode
             SceneContext context = _scene.GetRootGameObjects().Select(root => root.GetComponent<SceneContext>())
                 .Single(component => component != null);
             context.Container.Resolve<TickableManager>().Remove(_controller);
+            CustomPassVolume projection = _scene.GetRootGameObjects()
+                .SelectMany(root => root.GetComponentsInChildren<CustomPassVolume>()).Single();
+            var pass = (FullScreenCustomPass)projection.customPasses.Single();
+            Material material = pass.fullscreenPassMaterial;
+            VolumeProfile profile = projection.GetComponent<Volume>().profile;
             GameplayLifetime lifetime = context.Container.Resolve<GameplayLifetime>();
             context.Container.Resolve<DisposableManager>().Remove(lifetime);
             foreach (GameplayDebugOverlay overlay in _scene.GetRootGameObjects()
                          .SelectMany(root => root.GetComponentsInChildren<GameplayDebugOverlay>(true)))
                 overlay.enabled = false;
             lifetime.Dispose();
+            Assert.That(projection.enabled, Is.False);
+            Assert.That(pass.enabled, Is.False);
+            Assert.That(pass.fullscreenPassMaterial, Is.Null);
+            Assert.That(material.GetTexture("_BackgroundCube"), Is.Null);
             Assert.That(previousBoard.gameObject.activeSelf, Is.False);
             Assert.That(CurrentSimulation, Is.Null);
             yield return null;
             Assert.That(previousBoard == null, Is.True);
             Assert.That(_levelRoot.childCount, Is.Zero);
+            Assert.That(projection == null, Is.True);
+            Assert.That(material == null, Is.True);
+            Assert.That(profile == null, Is.True);
 
         }
 
@@ -288,6 +363,7 @@ namespace Sokoban.Tests.PlayMode
             Assert.That(simulation.CaptureSnapshot(), Is.EqualTo(before));
             HintArrow arrow = Board.GetComponentInChildren<HintArrow>();
             Assert.That(arrow, Is.Not.Null);
+            Assert.That(arrow.transform.position, Is.EqualTo(new Vector3(2.45f, 1.8f, 2f)));
             Assert.That(Vector3.Distance(arrow.transform.forward, Vector3.left), Is.LessThan(0.00001f));
             Assert.That(arrow.GetComponentsInChildren<Collider>(), Is.Empty);
             Assert.That(Board.childCount, Is.EqualTo(77));
@@ -296,6 +372,40 @@ namespace Sokoban.Tests.PlayMode
             _controller.Tick(0.16f);
             Assert.That(arrow.gameObject.activeSelf, Is.False);
             Assert.That(_controller.HintStatus, Is.EqualTo(HintStatus.None));
+            _controller.RequestHint();
+            _controller.Tick(0f);
+            deadline = Time.realtimeSinceStartup + 10f;
+            while (_controller.HintStatus == HintStatus.Calculating && Time.realtimeSinceStartup < deadline)
+            {
+                yield return null;
+                _controller.Tick(0f);
+            }
+            Assert.That(_controller.HintStatus, Is.EqualTo(HintStatus.Available));
+            Assert.That(_controller.HintMove, Is.EqualTo(MoveCommand.Up));
+            Assert.That(Board.GetComponentInChildren<HintArrow>(), Is.SameAs(arrow));
+            Assert.That(arrow.transform.position, Is.EqualTo(new Vector3(2f, 1.8f, 2.55f)));
+            Assert.That(simulation.PlayerPosition, Is.EqualTo(new GridPosition(2, 2)));
+            Assert.That(_controller.Moves, Is.EqualTo(1));
+            _controller.RequestUndo();
+            _controller.Tick(0.16f);
+            Assert.That(arrow.gameObject.activeSelf, Is.False);
+            Assert.That(_controller.HintStatus, Is.EqualTo(HintStatus.None));
+            Assert.That(_controller.Moves, Is.Zero);
+            Assert.That(simulation.BoardRevision, Is.EqualTo(2));
+            _controller.RequestHint();
+            _controller.Tick(0f);
+            deadline = Time.realtimeSinceStartup + 10f;
+            while (_controller.HintStatus == HintStatus.Calculating && Time.realtimeSinceStartup < deadline)
+            {
+                yield return null;
+                _controller.Tick(0f);
+            }
+            Assert.That(_controller.HintStatus, Is.EqualTo(HintStatus.Available));
+            Assert.That(_controller.HintMove, Is.EqualTo(MoveCommand.Left));
+            Assert.That(Board.GetComponentInChildren<HintArrow>(), Is.SameAs(arrow));
+            Assert.That(arrow.transform.position, Is.EqualTo(new Vector3(2.45f, 1.8f, 2f)));
+            Assert.That(simulation.PlayerPosition, Is.EqualTo(new GridPosition(3, 2)));
+            Assert.That(simulation.CaptureSnapshot().PlayerPosition, Is.EqualTo(before.PlayerPosition));
             _controller.RequestRestart();
             _controller.Tick(0f);
             Assert.That(Board.childCount, Is.EqualTo(76));
