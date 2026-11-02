@@ -32,6 +32,8 @@ namespace Sokoban.Tests.PlayMode
         private const string ScenePath = "Assets/_Sokoban/Scenes/GameplayScene.unity";
         private Scene _scene;
         private GameplayController _controller;
+        private IGameplayStatus _status;
+        private IGameplayCommands _commands;
         private Transform _levelRoot;
         private ViewCatalog _catalog;
         private Simulation CurrentSimulation
@@ -67,8 +69,10 @@ namespace Sokoban.Tests.PlayMode
             ITickable tickable = context.Container.ResolveAll<ITickable>().Single();
             Assert.That(tickable, Is.TypeOf<GameplayController>());
             _controller = context.Container.Resolve<GameplayController>();
-            Assert.That(context.Container.Resolve<IGameplayStatus>(), Is.SameAs(_controller));
-            Assert.That(context.Container.Resolve<IGameplayCommands>(), Is.SameAs(_controller));
+            _status = context.Container.Resolve<IGameplayStatus>();
+            Assert.That(_status, Is.SameAs(context.Container.Resolve<GameplayStatus>()));
+            _commands = context.Container.Resolve<IGameplayCommands>();
+            Assert.That(_commands, Is.SameAs(context.Container.Resolve<GameplayCommandInbox>()));
             Assert.That(tickable, Is.SameAs(_controller));
             var disposables = context.Container.ResolveAll<IDisposable>();
             Assert.That(disposables.OfType<GameplayLifetime>().Single(),
@@ -89,15 +93,29 @@ namespace Sokoban.Tests.PlayMode
             Assert.That(context.Container.HasBinding<HintArrow>(), Is.False);
             _levelRoot = context.Container.Resolve<LevelRoot>().Transform;
             float deadline = Time.realtimeSinceStartup + 10f;
-            while (_controller.Phase != GameplayPhase.SelectingCharacter && Time.realtimeSinceStartup < deadline) yield return null;
-            Assert.That(_controller.Phase, Is.EqualTo(GameplayPhase.SelectingCharacter));
+            while (_status.Phase != GameplayPhase.SelectingCharacter && Time.realtimeSinceStartup < deadline)
+            {
+                yield return null;
+            }
+            Assert.That(_status.Phase, Is.EqualTo(GameplayPhase.SelectingCharacter));
             Assert.That(CurrentSimulation.World.Single(e => e.Has<PlayerTag>()).Has<TransformComponent>(), Is.False);
             Assert.That(Board.childCount, Is.EqualTo(75));
-            _controller.RequestConfirmCharacter();
-            while (_controller.Phase != GameplayPhase.Playing && Time.realtimeSinceStartup < deadline) yield return null;
+            if (TestContext.CurrentContext.Test.MethodName == nameof(SelectionUiUsesKeyboardWithoutLeakingGameplayShortcuts))
+            {
+                _catalog = context.Container.Resolve<IStaticDataProvider>().GetViewCatalog();
+                yield break;
+            }
+            _commands.RequestConfirmCharacter();
+            while (_status.Phase != GameplayPhase.Playing && Time.realtimeSinceStartup < deadline)
+            {
+                yield return null;
+            }
             Assert.That(CurrentSimulation, Is.Not.Null, "Initial Addressable content did not load within 10 seconds.");
             _catalog = context.Container.Resolve<IStaticDataProvider>().GetViewCatalog();
-            while (CurrentSimulation.World.Any(entity => entity.Has<GridPosition>() && !entity.Has<TransformComponent>()) && Time.realtimeSinceStartup < deadline) yield return null;
+            while (CurrentSimulation.World.Any(entity => entity.Has<GridPosition>() && !entity.Has<TransformComponent>()) && Time.realtimeSinceStartup < deadline)
+            {
+                yield return null;
+            }
             Assert.That(Board.childCount, Is.EqualTo(76));
             Assert.That(CurrentSimulation.World.Count(), Is.EqualTo(77));
             Entity levelState = CurrentSimulation.World.Single(entity => entity.Has<LevelStateTag>());
@@ -107,8 +125,14 @@ namespace Sokoban.Tests.PlayMode
         [UnityTearDown]
         public IEnumerator TearDown()
         {
-            if (_scene.IsValid() && _scene.isLoaded) yield return SceneManager.UnloadSceneAsync(_scene);
-            if (_keyboard != null && _keyboard.added) InputSystem.RemoveDevice(_keyboard);
+            if (_scene.IsValid() && _scene.isLoaded)
+            {
+                yield return SceneManager.UnloadSceneAsync(_scene);
+            }
+            if (_keyboard != null && _keyboard.added)
+            {
+                InputSystem.RemoveDevice(_keyboard);
+            }
             InputSystem.settings.editorInputBehaviorInPlayMode = _editorInput;
             InputSystem.settings.backgroundBehavior = _backgroundInput;
         }
@@ -134,32 +158,32 @@ namespace Sokoban.Tests.PlayMode
             var pass = (FullScreenCustomPass)projection.customPasses.Single();
             Assert.That(pass.fullscreenPassMaterial.shader, Is.SameAs(shader));
             float deadline = Time.realtimeSinceStartup + 10f;
-            while (_controller.BackgroundStatus != BackgroundStatus.Ready && Time.realtimeSinceStartup < deadline)
+            while (_status.BackgroundStatus != BackgroundStatus.Ready && Time.realtimeSinceStartup < deadline)
             {
                 yield return null;
             }
-            Assert.That(_controller.BackgroundStatus, Is.EqualTo(BackgroundStatus.Ready));
-            string initial = _controller.BackgroundName;
-            _controller.RequestNextBackground();
-            while ((_controller.BackgroundName == initial || _controller.BackgroundStatus != BackgroundStatus.Ready)
+            Assert.That(_status.BackgroundStatus, Is.EqualTo(BackgroundStatus.Ready));
+            string initial = _status.BackgroundName;
+            _commands.RequestNextBackground();
+            while ((_status.BackgroundName == initial || _status.BackgroundStatus != BackgroundStatus.Ready)
                    && Time.realtimeSinceStartup < deadline)
             {
                 yield return null;
             }
-            Assert.That(_controller.BackgroundName, Is.Not.EqualTo(initial));
-            Assert.That(_controller.BackgroundStatus, Is.EqualTo(BackgroundStatus.Ready));
-            string selected = _controller.BackgroundName;
+            Assert.That(_status.BackgroundName, Is.Not.EqualTo(initial));
+            Assert.That(_status.BackgroundStatus, Is.EqualTo(BackgroundStatus.Ready));
+            string selected = _status.BackgroundName;
             Texture texture = pass.fullscreenPassMaterial.GetTexture("_BackgroundCube");
             Assert.That(texture, Is.Not.Null);
             Transform oldBoard = Board;
-            _controller.RequestRestart();
-            while ((Board == oldBoard || _controller.Phase != GameplayPhase.Playing) && Time.realtimeSinceStartup < deadline)
+            _commands.RequestRestart();
+            while ((Board == oldBoard || _status.Phase != GameplayPhase.Playing) && Time.realtimeSinceStartup < deadline)
             {
                 yield return null;
             }
             Assert.That(Board, Is.Not.SameAs(oldBoard));
-            Assert.That(_controller.Phase, Is.EqualTo(GameplayPhase.Playing));
-            Assert.That(_controller.BackgroundName, Is.EqualTo(selected));
+            Assert.That(_status.Phase, Is.EqualTo(GameplayPhase.Playing));
+            Assert.That(_status.BackgroundName, Is.EqualTo(selected));
             Assert.That(pass.fullscreenPassMaterial.GetTexture("_BackgroundCube"), Is.SameAs(texture));
             Assert.That(volume.GetComponents<CustomPassVolume>().Single(), Is.SameAs(projection));
         }
@@ -194,6 +218,91 @@ namespace Sokoban.Tests.PlayMode
             Assert.That(View("Box (4, 3)").position, Is.EqualTo(new Vector3(4, 0, 4)));
             Assert.That(secondGoal.position, Is.EqualTo(new Vector3(4, 0, 4)));
             Assert.That(secondGoal.GetComponentInChildren<Renderer>().sharedMaterial, Is.SameAs(goalMaterial));
+        }
+
+        [UnityTest]
+        public IEnumerator Playthrough_UsesOneSelectionAndExplicitNextWithWatchBackAndFinalResults()
+        {
+            UIDocument document = _scene.GetRootGameObjects()
+                .SelectMany(root => root.GetComponentsInChildren<UIDocument>()).Single();
+            SkinId skin = _status.SelectedCharacter;
+            for (int level = 1; level <= 3; level++)
+            {
+                Assert.That(_status.LevelNumber, Is.EqualTo(level));
+                Assert.That(_status.Phase, Is.EqualTo(GameplayPhase.Playing));
+                Assert.That(CurrentSimulation.World.Single(e => e.Has<PlayerTag>()).Get<ViewSkin>().Id, Is.EqualTo(skin));
+                for (int move = 0; move < 100 && _status.Phase == GameplayPhase.Playing; move++)
+                {
+                    yield return WaitFor(() => _commands.CanHint, "stationary hint eligibility");
+                    _commands.RequestHint();
+                    yield return WaitFor(() => _status.HintStatus == HintStatus.Available, "hint result");
+                    int count = _status.Moves;
+                    CurrentSimulation.Send(_status.HintMove);
+                    yield return WaitFor(() => _status.Moves > count || _status.Phase != GameplayPhase.Playing, "recorded move");
+                }
+                GameplayPhase completion = level == 3 ? GameplayPhase.Finished : GameplayPhase.Completed;
+                Assert.That(_status.Phase, Is.EqualTo(completion));
+                Simulation original = CurrentSimulation;
+                GameplaySnapshot snapshot = original.CaptureSnapshot();
+                int inputs = original.ExportRecording().Inputs.Count;
+                Transform root = Board;
+                string background = _status.BackgroundName;
+                yield return null;
+                yield return null;
+                Assert.That(_status.Phase, Is.EqualTo(completion));
+                Assert.That(_status.Results.Count, Is.EqualTo(level));
+                Submit(level == 3 ? "watchFinalReplay" : "watchReplay");
+                yield return WaitFor(() => _status.Phase == GameplayPhase.Replaying, "replay binding");
+                yield return null; // Let the scene-owned UI refresh its enabled state in LateUpdate.
+                Assert.That(root.gameObject.activeSelf, Is.False);
+                Assert.That(_levelRoot.GetComponentsInChildren<PlayerAnimator>(true).Length, Is.EqualTo(2));
+                Submit("pauseReplay");
+                yield return WaitFor(() => _status.Phase == GameplayPhase.ReplayPaused, "pause");
+                yield return null;
+                Assert.That(original.CaptureSnapshot(), Is.EqualTo(snapshot));
+                Assert.That(original.ExportRecording().Inputs.Count, Is.EqualTo(inputs));
+                Submit("pauseReplay");
+                yield return WaitFor(() => _status.Phase == GameplayPhase.ReplayFinished, "replay endpoint");
+                Assert.That(_status.Results.Count, Is.EqualTo(level));
+                Submit("backFromReplay");
+                yield return WaitFor(() => _status.Phase == completion, "return to completion");
+                yield return null;
+                Assert.That(CurrentSimulation, Is.SameAs(original));
+                Assert.That(original.CaptureSnapshot(), Is.EqualTo(snapshot));
+                Assert.That(original.ExportRecording().Inputs.Count, Is.EqualTo(inputs));
+                Assert.That(root.gameObject.activeSelf, Is.True);
+                Assert.That(_levelRoot.childCount, Is.EqualTo(1));
+                Assert.That(_status.BackgroundName, Is.EqualTo(background));
+                if (level < 3)
+                {
+                    Submit("nextLevel");
+                    yield return WaitFor(() => _status.LevelNumber == level + 1 && _status.Phase == GameplayPhase.Playing, "next level without selection");
+                }
+            }
+            Submit("playAgain");
+            yield return WaitFor(() => _status.Phase == GameplayPhase.SelectingCharacter, "new playthrough selection");
+            Assert.That(_status.Results, Is.Empty);
+            Assert.That(_commands.CanWatchReplay, Is.False);
+            Assert.That(CurrentSimulation.World.Single(e => e.Has<PlayerTag>()).Has<TransformComponent>(), Is.False);
+
+            void Submit(string name)
+            {
+                using var evt = NavigationSubmitEvent.GetPooled();
+                Button button = document.rootVisualElement.Q<Button>(name);
+                Assert.That(button.enabledInHierarchy, Is.True, name);
+                evt.target = button;
+                button.SendEvent(evt);
+            }
+
+            IEnumerator WaitFor(Func<bool> ready, string description)
+            {
+                float deadline = Time.realtimeSinceStartup + 15f;
+                while (ready() == false && Time.realtimeSinceStartup < deadline)
+                {
+                    yield return null;
+                }
+                Assert.That(ready(), Is.True, description + ": " + _status.Phase);
+            }
         }
 
         [UnityTest]
@@ -260,7 +369,9 @@ namespace Sokoban.Tests.PlayMode
             context.Container.Resolve<DisposableManager>().Remove(lifetime);
             foreach (GameplayDebugOverlay overlay in _scene.GetRootGameObjects()
                          .SelectMany(root => root.GetComponentsInChildren<GameplayDebugOverlay>(true)))
+            {
                 overlay.enabled = false;
+            }
             lifetime.Dispose();
             Assert.That(projection.enabled, Is.False);
             Assert.That(pass.enabled, Is.False);
@@ -316,22 +427,22 @@ namespace Sokoban.Tests.PlayMode
             _controller.Tick(0.16f);
             _controller.Tick(0.055f);
             Assert.That(animator.IsPlaying, Is.True);
-            Assert.That(_controller.CanUndo, Is.True);
+            Assert.That(_commands.CanUndo, Is.True);
             InputSystem.QueueStateEvent(_keyboard, new KeyboardState(Key.Z));
             InputSystem.Update();
             _controller.Tick(0.04f);
             InputSystem.QueueStateEvent(_keyboard, new KeyboardState());
             InputSystem.Update();
-            Assert.That(_controller.Moves, Is.EqualTo(1));
+            Assert.That(_status.Moves, Is.EqualTo(1));
             Assert.That(box.Get<GridPosition>(), Is.EqualTo(new GridPosition(2, 3)));
             Assert.That(box.Get<TransformComponent>().Transform.position.z, Is.EqualTo(3.75f).Within(0.001f));
             Assert.That(animator.IsPlaying, Is.False);
             Assert.That(PrimeTween.Tween.GetTweensCount(visual), Is.Zero);
             Assert.That(visual.localPosition, Is.EqualTo(baseline));
             Assert.That(visual.localScale, Is.EqualTo(scale));
-            Assert.That(_controller.CanUndo, Is.False);
+            Assert.That(_commands.CanUndo, Is.False);
             _controller.Tick(0.12f);
-            Assert.That(_controller.CanUndo, Is.True);
+            Assert.That(_commands.CanUndo, Is.True);
             Assert.That(box.Get<TransformComponent>().Transform.position, Is.EqualTo(new Vector3(2, 0, 3)));
             Assert.That(CurrentSimulation, Is.SameAs(simulation));
             Assert.That(Board, Is.SameAs(board));
@@ -350,16 +461,16 @@ namespace Sokoban.Tests.PlayMode
             context.Container.Resolve<TickableManager>().Remove(_controller);
             Simulation simulation = CurrentSimulation;
             GameplaySnapshot before = simulation.CaptureSnapshot();
-            _controller.RequestHint();
+            _commands.RequestHint();
             _controller.Tick(0f);
             float deadline = Time.realtimeSinceStartup + 10f;
-            while (_controller.HintStatus == HintStatus.Calculating && Time.realtimeSinceStartup < deadline)
+            while (_status.HintStatus == HintStatus.Calculating && Time.realtimeSinceStartup < deadline)
             {
                 yield return null;
                 _controller.Tick(0f);
             }
-            Assert.That(_controller.HintStatus, Is.EqualTo(HintStatus.Available));
-            Assert.That(_controller.HintMove, Is.EqualTo(MoveCommand.Left));
+            Assert.That(_status.HintStatus, Is.EqualTo(HintStatus.Available));
+            Assert.That(_status.HintMove, Is.EqualTo(MoveCommand.Left));
             Assert.That(simulation.CaptureSnapshot(), Is.EqualTo(before));
             HintArrow arrow = Board.GetComponentInChildren<HintArrow>();
             Assert.That(arrow, Is.Not.Null);
@@ -371,42 +482,42 @@ namespace Sokoban.Tests.PlayMode
             simulation.Send(MoveCommand.Left);
             _controller.Tick(0.16f);
             Assert.That(arrow.gameObject.activeSelf, Is.False);
-            Assert.That(_controller.HintStatus, Is.EqualTo(HintStatus.None));
-            _controller.RequestHint();
+            Assert.That(_status.HintStatus, Is.EqualTo(HintStatus.None));
+            _commands.RequestHint();
             _controller.Tick(0f);
             deadline = Time.realtimeSinceStartup + 10f;
-            while (_controller.HintStatus == HintStatus.Calculating && Time.realtimeSinceStartup < deadline)
+            while (_status.HintStatus == HintStatus.Calculating && Time.realtimeSinceStartup < deadline)
             {
                 yield return null;
                 _controller.Tick(0f);
             }
-            Assert.That(_controller.HintStatus, Is.EqualTo(HintStatus.Available));
-            Assert.That(_controller.HintMove, Is.EqualTo(MoveCommand.Up));
+            Assert.That(_status.HintStatus, Is.EqualTo(HintStatus.Available));
+            Assert.That(_status.HintMove, Is.EqualTo(MoveCommand.Up));
             Assert.That(Board.GetComponentInChildren<HintArrow>(), Is.SameAs(arrow));
             Assert.That(arrow.transform.position, Is.EqualTo(new Vector3(2f, 1.8f, 2.55f)));
             Assert.That(simulation.PlayerPosition, Is.EqualTo(new GridPosition(2, 2)));
-            Assert.That(_controller.Moves, Is.EqualTo(1));
-            _controller.RequestUndo();
+            Assert.That(_status.Moves, Is.EqualTo(1));
+            _commands.RequestUndo();
             _controller.Tick(0.16f);
             Assert.That(arrow.gameObject.activeSelf, Is.False);
-            Assert.That(_controller.HintStatus, Is.EqualTo(HintStatus.None));
-            Assert.That(_controller.Moves, Is.Zero);
+            Assert.That(_status.HintStatus, Is.EqualTo(HintStatus.None));
+            Assert.That(_status.Moves, Is.Zero);
             Assert.That(simulation.BoardRevision, Is.EqualTo(2));
-            _controller.RequestHint();
+            _commands.RequestHint();
             _controller.Tick(0f);
             deadline = Time.realtimeSinceStartup + 10f;
-            while (_controller.HintStatus == HintStatus.Calculating && Time.realtimeSinceStartup < deadline)
+            while (_status.HintStatus == HintStatus.Calculating && Time.realtimeSinceStartup < deadline)
             {
                 yield return null;
                 _controller.Tick(0f);
             }
-            Assert.That(_controller.HintStatus, Is.EqualTo(HintStatus.Available));
-            Assert.That(_controller.HintMove, Is.EqualTo(MoveCommand.Left));
+            Assert.That(_status.HintStatus, Is.EqualTo(HintStatus.Available));
+            Assert.That(_status.HintMove, Is.EqualTo(MoveCommand.Left));
             Assert.That(Board.GetComponentInChildren<HintArrow>(), Is.SameAs(arrow));
             Assert.That(arrow.transform.position, Is.EqualTo(new Vector3(2.45f, 1.8f, 2f)));
             Assert.That(simulation.PlayerPosition, Is.EqualTo(new GridPosition(3, 2)));
             Assert.That(simulation.CaptureSnapshot().PlayerPosition, Is.EqualTo(before.PlayerPosition));
-            _controller.RequestRestart();
+            _commands.RequestRestart();
             _controller.Tick(0f);
             Assert.That(Board.childCount, Is.EqualTo(76));
             yield return null;
@@ -418,7 +529,10 @@ namespace Sokoban.Tests.PlayMode
         public IEnumerator HeldKey_DoesNotRepeatAndSimultaneousDirectionsKeepPriority()
         {
             InputSystem.QueueStateEvent(_keyboard, new KeyboardState(Key.UpArrow, Key.LeftArrow));
-            for (int i = 0; i < 8; i++) yield return null;
+            for (int i = 0; i < 8; i++)
+            {
+                yield return null;
+            }
             yield return WaitForMotion();
             AssertActors(new Vector3(3, 0, 3), new Vector3(2, 0, 3), new Vector3(4, 0, 3));
             InputSystem.QueueStateEvent(_keyboard, new KeyboardState());
@@ -453,7 +567,7 @@ namespace Sokoban.Tests.PlayMode
             Assert.That(visual.localPosition.y, Is.GreaterThan(baseline.y));
             Assert.That(visual.localScale, Is.Not.EqualTo(scale));
             Assert.That(box.Get<TransformComponent>().Transform.position, Is.EqualTo(new Vector3(2, 0, 4)));
-            _controller.RequestRestart();
+            _commands.RequestRestart();
             _controller.Tick(0f);
             Assert.That(oldBoard.gameObject.activeSelf, Is.False);
             Assert.That(visual.localPosition, Is.EqualTo(baseline));
@@ -477,13 +591,19 @@ namespace Sokoban.Tests.PlayMode
             _controller.RequestNextSkin();
             float deadline = Time.realtimeSinceStartup + 5f;
             while ((!player.Has<PlayerAnimatorComponent>() || player.Get<ViewSkin>().Id != SkinId.Alternate)
-                   && Time.realtimeSinceStartup < deadline) yield return null;
+                   && Time.realtimeSinceStartup < deadline)
+            {
+                yield return null;
+            }
             Assert.That(player.Get<ViewSkin>().Id, Is.EqualTo(SkinId.Alternate));
             Assert.That(player.Has<PlayerAnimatorComponent>(), Is.True);
             Assert.That(CurrentSimulation, Is.SameAs(original));
             Activate(document.rootVisualElement.Q<Button>("restart"));
             Activate(document.rootVisualElement.Q<Button>("restart"));
-            while (CurrentSimulation == original && Time.realtimeSinceStartup < deadline) yield return null;
+            while (CurrentSimulation == original && Time.realtimeSinceStartup < deadline)
+            {
+                yield return null;
+            }
             Assert.That(CurrentSimulation, Is.Not.SameAs(original));
             Assert.That(CurrentSimulation.World.Single(e => e.Has<PlayerTag>()).Get<ViewSkin>().Id, Is.EqualTo(SkinId.Alternate));
         }
@@ -508,7 +628,10 @@ namespace Sokoban.Tests.PlayMode
                     yield return null;
                 }
                 float deadline = Time.realtimeSinceStartup + 5f;
-                while (!player.Has<PlayerAnimatorComponent>() && Time.realtimeSinceStartup < deadline) yield return null;
+                while (!player.Has<PlayerAnimatorComponent>() && Time.realtimeSinceStartup < deadline)
+                {
+                    yield return null;
+                }
                 Assert.That(player.Get<ViewSkin>().Id, Is.EqualTo(skin));
                 Assert.That(player.Has<PlayerAnimatorComponent>(), Is.True);
                 Assert.That(player.Get<PlayerAnimatorComponent>().Animator != null, Is.True);
@@ -520,13 +643,12 @@ namespace Sokoban.Tests.PlayMode
         [UnityTest]
         public IEnumerator SelectionUiUsesKeyboardWithoutLeakingGameplayShortcuts()
         {
-            yield return Press(Key.N);
             float deadline = Time.realtimeSinceStartup + 10f;
-            while (_controller.Phase != GameplayPhase.SelectingCharacter && Time.realtimeSinceStartup < deadline)
+            while (_status.Phase != GameplayPhase.SelectingCharacter && Time.realtimeSinceStartup < deadline)
             {
                 yield return null;
             }
-            Assert.That(_controller.Phase, Is.EqualTo(GameplayPhase.SelectingCharacter));
+            Assert.That(_status.Phase, Is.EqualTo(GameplayPhase.SelectingCharacter));
             Simulation simulation = CurrentSimulation;
             Entity player = simulation.World.Single(e => e.Has<PlayerTag>());
             GameplaySnapshot before = simulation.CaptureSnapshot();
@@ -538,18 +660,18 @@ namespace Sokoban.Tests.PlayMode
             Assert.That(player.Has<TransformComponent>(), Is.False);
             yield return Press(Key.RightArrow);
             yield return Press(Key.Enter);
-            Assert.That(_controller.SelectedCharacter, Is.EqualTo(SkinId.Alternate));
+            Assert.That(_status.SelectedCharacter, Is.EqualTo(SkinId.Alternate));
             yield return Press(Key.Tab);
             yield return Press(Key.Tab);
             yield return Press(Key.Enter);
-            while (_controller.Phase != GameplayPhase.Playing && Time.realtimeSinceStartup < deadline)
+            while (_status.Phase != GameplayPhase.Playing && Time.realtimeSinceStartup < deadline)
             {
                 yield return null;
             }
-            Assert.That(_controller.Phase, Is.EqualTo(GameplayPhase.Playing));
+            Assert.That(_status.Phase, Is.EqualTo(GameplayPhase.Playing));
             Assert.That(player.Get<ViewSkin>().Id, Is.EqualTo(SkinId.Alternate));
             Assert.That(player.Has<PlayerAnimatorComponent>(), Is.True);
-            Assert.That(_controller.Moves, Is.Zero);
+            Assert.That(_status.Moves, Is.Zero);
             Transform view = player.Get<TransformComponent>().Transform;
             yield return Press(Key.K);
             Assert.That(player.Get<TransformComponent>().Transform, Is.SameAs(view));
@@ -677,7 +799,9 @@ namespace Sokoban.Tests.PlayMode
         {
             float deadline = Time.realtimeSinceStartup + 2f;
             while (CurrentSimulation.World.Any(entity => entity.Has<ViewMove>()) && Time.realtimeSinceStartup < deadline)
+            {
                 yield return null;
+            }
             Assert.That(CurrentSimulation.World.Any(entity => entity.Has<ViewMove>()), Is.False);
         }
 

@@ -16,7 +16,10 @@ namespace Sokoban.Editor
         public static void ValidateAll()
         {
             AddressableAssetSettings settings = AddressableAssetSettingsDefaultObject.Settings;
-            if (settings == null) throw new InvalidOperationException("Create Addressables settings before validating addresses.");
+            if (settings == null)
+            {
+                throw new InvalidOperationException("Create Addressables settings before validating addresses.");
+            }
             var entries = new List<AddressableAssetEntry>();
             settings.GetAllAssets(entries, false);
             ValidateConfigs(entries);
@@ -26,9 +29,11 @@ namespace Sokoban.Editor
                 ViewCatalog catalog = AssetDatabase.LoadAssetAtPath<ViewCatalog>(path);
                 ValidateHintArrow(catalog.Resolve(new ViewKey(ViewKind.HintArrow, SkinId.Default)).Address, entries, path);
                 foreach (ViewCatalog.KindEntry kind in catalog.Entries)
-                foreach (ViewCatalog.SkinEntry skin in kind.Skins)
                 {
-                    ValidateAddress(skin.Address, typeof(GameObject), entries, $"{path}: {new ViewKey(kind.Kind, skin.Skin)}");
+                    foreach (ViewCatalog.SkinEntry skin in kind.Skins)
+                    {
+                        ValidateAddress(skin.Address, typeof(GameObject), entries, $"{path}: {new ViewKey(kind.Kind, skin.Skin)}");
+                    }
                 }
             }
             foreach (string guid in AssetDatabase.FindAssets("t:BackgroundCatalog"))
@@ -62,7 +67,10 @@ namespace Sokoban.Editor
 
         public static void ValidateAddress(string address, Type expectedType, IEnumerable<AddressableAssetEntry> entries, string context)
         {
-            if (string.IsNullOrWhiteSpace(address)) throw new InvalidOperationException($"{context}: empty address.");
+            if (string.IsNullOrWhiteSpace(address))
+            {
+                throw new InvalidOperationException($"{context}: empty address.");
+            }
             AddressableAssetEntry[] matches = entries.Where(entry => string.Equals(entry.address, address, StringComparison.Ordinal)).ToArray();
             if (matches.Length != 1)
             {
@@ -70,12 +78,12 @@ namespace Sokoban.Editor
             }
             AddressableAssetEntry match = matches[0];
             Type actualType = AssetDatabase.GetMainAssetTypeAtPath(match.AssetPath);
-            if (actualType == null || !expectedType.IsAssignableFrom(actualType))
+            if (actualType == null || expectedType.IsAssignableFrom(actualType) == false)
             {
                 throw new InvalidOperationException($"{context}: address '{address}' must reference {expectedType.Name}, found {actualType?.Name ?? "missing asset"}.");
             }
             BundledAssetGroupSchema schema = match.parentGroup.GetSchema<BundledAssetGroupSchema>();
-            if (!match.parentGroup.IncludeInBuild || schema != null && !schema.IncludeAddressInCatalog)
+            if (match.parentGroup.IncludeInBuild == false || schema != null && schema.IncludeAddressInCatalog == false)
             {
                 throw new InvalidOperationException($"{context}: address '{address}' is excluded from the build or its catalog addresses are disabled.");
             }
@@ -89,12 +97,16 @@ namespace Sokoban.Editor
                 AddressableAssetEntry[] matches = all.Where(entry => entry.labels.Contains(StaticDataProvider.ConfigLabel)
                     && type.IsAssignableFrom(AssetDatabase.GetMainAssetTypeAtPath(entry.AssetPath))).ToArray();
                 if (matches.Length != 1)
+                {
                     throw new InvalidOperationException($"Label '{StaticDataProvider.ConfigLabel}' must contain exactly one {type.Name}; found {matches.Length}.");
+                }
                 AddressableAssetEntry match = matches[0];
                 ValidateAddress(match.address, type, all, StaticDataProvider.ConfigLabel);
                 BundledAssetGroupSchema schema = match.parentGroup.GetSchema<BundledAssetGroupSchema>();
                 if (schema != null && !schema.IncludeLabelsInCatalog)
+                {
                     throw new InvalidOperationException($"{match.address}: config labels are excluded from the catalog.");
+                }
             }
         }
 
@@ -104,7 +116,9 @@ namespace Sokoban.Editor
             AddressableAssetEntry entry = entries.Single(entry => entry.address == address);
             GameObject prefab = AssetDatabase.LoadAssetAtPath<GameObject>(entry.AssetPath);
             if (prefab.GetComponent<HintArrow>() == null)
+            {
                 throw new InvalidOperationException($"{context}: address '{address}' must reference a prefab with HintArrow.");
+            }
         }
     }
 }

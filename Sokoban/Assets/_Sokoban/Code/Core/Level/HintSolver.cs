@@ -174,7 +174,10 @@ namespace Sokoban.Core
                 unchecked
                 {
                     int hash = Player.GetHashCode();
-                    foreach (GridPosition box in Boxes) hash = (hash * 397) ^ box.GetHashCode();
+                    foreach (GridPosition box in Boxes)
+                    {
+                        hash = (hash * 397) ^ box.GetHashCode();
+                    }
                     return hash;
                 }
             }

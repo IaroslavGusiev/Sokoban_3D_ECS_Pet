@@ -308,8 +308,14 @@ namespace Sokoban.Tests.App
                 Assert.That(history.Entries.Count, Is.Zero);
                 worldDisposals++;
             });
-            if (disposalFails) Assert.Throws<InvalidOperationException>(() => simulation.Dispose());
-            else Assert.DoesNotThrow(() => simulation.Dispose());
+            if (disposalFails)
+            {
+                Assert.Throws<InvalidOperationException>(() => simulation.Dispose());
+            }
+            else
+            {
+                Assert.DoesNotThrow(() => simulation.Dispose());
+            }
             Assert.That(worldDisposals, Is.EqualTo(1));
             Assert.That(history.Entries.Count, Is.Zero);
         }
@@ -341,7 +347,10 @@ namespace Sokoban.Tests.App
             {
                 DisposeCalls++;
                 OnDispose?.Invoke();
-                if (ThrowOnDispose) throw new InvalidOperationException("Test disposal failure");
+                if (ThrowOnDispose)
+                {
+                    throw new InvalidOperationException("Test disposal failure");
+                }
             }
         }
 

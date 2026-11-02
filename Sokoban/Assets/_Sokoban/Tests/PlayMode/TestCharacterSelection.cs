@@ -38,9 +38,9 @@ namespace Sokoban.Tests.PlayMode
         public static void Tick(GameplayController controller, float deltaTime)
         {
             controller.Tick(deltaTime);
-            if (controller.Phase == GameplayPhase.SelectingCharacter)
+            if (TestGameplay.Status(controller).Phase == GameplayPhase.SelectingCharacter)
             {
-                controller.RequestConfirmCharacter();
+                TestGameplay.Commands(controller).RequestConfirmCharacter();
                 controller.Tick(0f);
             }
         }

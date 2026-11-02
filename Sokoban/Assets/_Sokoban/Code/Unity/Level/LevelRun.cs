@@ -106,6 +106,12 @@ namespace Sokoban.Presentation
             }
         }
 
+        public SimulationRecording ExportRecording() =>
+            _simulation.ExportRecording();
+
+        public void SetVisible(bool visible) =>
+            _viewLayer.SetVisible(visible);
+
         public void TickView(float deltaTime) => 
             _viewLayer.Tick(deltaTime);
 
@@ -138,7 +144,10 @@ namespace Sokoban.Presentation
         public void Send(MoveCommand command)
         {
             if (command is not (MoveCommand.Up or MoveCommand.Down or MoveCommand.Left or MoveCommand.Right)
-                || _bufferedMove != 0 || _simulation.IsCompleted || _simulation.IsTimedOut) return;
+                || _bufferedMove != 0 || _simulation.IsCompleted || _simulation.IsTimedOut)
+            {
+                return;
+            }
 
             _bufferedMove = command;
         }

@@ -55,14 +55,14 @@ namespace Sokoban.Tests.PlayMode
             Assert.That(f.Provider.Players, Is.Empty);
             GameplaySnapshot before = simulation.CaptureSnapshot();
             f.Controller.Tick(20f);
-            Assert.That(f.Controller.Phase, Is.EqualTo(GameplayPhase.SelectingCharacter));
+            Assert.That(TestGameplay.Status(f.Controller).Phase, Is.EqualTo(GameplayPhase.SelectingCharacter));
             for (int index = 0; index < 5; index++)
             {
                 f.Controller.Tick(20f);
             }
             Assert.That(simulation.CaptureSnapshot(), Is.EqualTo(before));
             Assert.That(simulation.ExportRecording().Inputs, Is.Empty);
-            Assert.That(f.Controller.Characters, Is.EqualTo(f.Data.Views.Entries.Single().Skins.Select(s => s.Skin)));
+            Assert.That(TestGameplay.Status(f.Controller).Characters, Is.EqualTo(f.Data.Views.Entries.Single().Skins.Select(s => s.Skin)));
             Assert.That(f.Input.Reads, Is.Zero);
             Assert.That(f.Provider.Players, Is.Empty);
         }
@@ -73,25 +73,25 @@ namespace Sokoban.Tests.PlayMode
             Fixture f = Create();
             EnterSelection(f);
             f.Input.IsNeutral = false;
-            f.Controller.RequestCharacter(SkinId.Punk);
-            f.Controller.RequestConfirmCharacter();
-            f.Controller.RequestConfirmCharacter();
+            TestGameplay.Commands(f.Controller).RequestCharacter(SkinId.Punk);
+            TestGameplay.Commands(f.Controller).RequestConfirmCharacter();
+            TestGameplay.Commands(f.Controller).RequestConfirmCharacter();
             f.Controller.Tick(10f);
-            Assert.That(f.Controller.Phase, Is.EqualTo(GameplayPhase.BindingCharacter));
+            Assert.That(TestGameplay.Status(f.Controller).Phase, Is.EqualTo(GameplayPhase.BindingCharacter));
             Assert.That(f.Provider.Players.Select(r => r.Key.Skin), Is.EqualTo(new[] { SkinId.Punk }));
-            f.Controller.RequestCharacter(SkinId.Alternate);
-            f.Controller.RequestConfirmCharacter();
+            TestGameplay.Commands(f.Controller).RequestCharacter(SkinId.Alternate);
+            TestGameplay.Commands(f.Controller).RequestConfirmCharacter();
             f.Controller.Tick(10f);
             Assert.That(f.Provider.Players.Count, Is.EqualTo(1));
-            Assert.That(f.Controller.RemainingSeconds, Is.EqualTo(60f));
+            Assert.That(TestGameplay.Status(f.Controller).RemainingSeconds, Is.EqualTo(60f));
             f.Provider.Players[0].Source.TrySetResult(f.Provider.Prefab);
             f.Controller.Tick(10f);
-            Assert.That(f.Controller.Phase, Is.EqualTo(GameplayPhase.BindingCharacter));
-            Assert.That(f.Controller.RemainingSeconds, Is.EqualTo(60f));
+            Assert.That(TestGameplay.Status(f.Controller).Phase, Is.EqualTo(GameplayPhase.BindingCharacter));
+            Assert.That(TestGameplay.Status(f.Controller).RemainingSeconds, Is.EqualTo(60f));
             Assert.That(f.Input.Reads, Is.Zero);
             f.Input.IsNeutral = true;
             f.Controller.Tick(0f);
-            Assert.That(f.Controller.Phase, Is.EqualTo(GameplayPhase.Playing));
+            Assert.That(TestGameplay.Status(f.Controller).Phase, Is.EqualTo(GameplayPhase.Playing));
             Entity player = Player(SimulationOf(f.Controller));
             Assert.That(player.Get<ViewSkin>().Id, Is.EqualTo(SkinId.Punk));
             Assert.That(player.Has<TransformComponent>(), Is.True);
@@ -99,7 +99,7 @@ namespace Sokoban.Tests.PlayMode
             Assert.That(ActiveBoard(f).Cast<Transform>().Count(t => t.name.StartsWith("Player")), Is.EqualTo(1));
             f.Input.Move = MoveCommand.Right;
             f.Controller.Tick(0.16f);
-            Assert.That(f.Controller.Moves, Is.EqualTo(1));
+            Assert.That(TestGameplay.Status(f.Controller).Moves, Is.EqualTo(1));
         }
 
         [Test]
@@ -110,36 +110,36 @@ namespace Sokoban.Tests.PlayMode
             Confirm(f, SkinId.Punk);
             f.Provider.Players[0].Source.TrySetException(new InvalidOperationException("planned character failure"));
             f.Controller.Tick(15f);
-            Assert.That(f.Controller.Phase, Is.EqualTo(GameplayPhase.CharacterFailed));
-            Assert.That(f.Controller.CanConfirmCharacter, Is.True);
-            Assert.That(f.Controller.RemainingSeconds, Is.EqualTo(60f));
+            Assert.That(TestGameplay.Status(f.Controller).Phase, Is.EqualTo(GameplayPhase.CharacterFailed));
+            Assert.That(TestGameplay.Commands(f.Controller).CanConfirmCharacter, Is.True);
+            Assert.That(TestGameplay.Status(f.Controller).RemainingSeconds, Is.EqualTo(60f));
             Assert.That(Player(SimulationOf(f.Controller)).Has<TransformComponent>(), Is.False);
-            f.Controller.RequestConfirmCharacter();
+            TestGameplay.Commands(f.Controller).RequestConfirmCharacter();
             f.Controller.Tick(0f);
             Assert.That(f.Provider.Players[1].Key.Skin, Is.EqualTo(SkinId.Punk));
             f.Provider.Players[1].Source.TrySetException(new InvalidOperationException("planned retry failure"));
             f.Controller.Tick(0f);
-            Assert.That(f.Controller.Phase, Is.EqualTo(GameplayPhase.CharacterFailed));
-            f.Controller.RequestCharacter(SkinId.Alternate);
+            Assert.That(TestGameplay.Status(f.Controller).Phase, Is.EqualTo(GameplayPhase.CharacterFailed));
+            TestGameplay.Commands(f.Controller).RequestCharacter(SkinId.Alternate);
             f.Controller.Tick(0f);
-            Assert.That(f.Controller.Phase, Is.EqualTo(GameplayPhase.SelectingCharacter));
+            Assert.That(TestGameplay.Status(f.Controller).Phase, Is.EqualTo(GameplayPhase.SelectingCharacter));
             Confirm(f, SkinId.Alternate);
             f.Provider.Players[2].Source.TrySetResult(f.Provider.Prefab);
             f.Controller.Tick(0f);
-            Assert.That(f.Controller.Phase, Is.EqualTo(GameplayPhase.Playing));
+            Assert.That(TestGameplay.Status(f.Controller).Phase, Is.EqualTo(GameplayPhase.Playing));
             Assert.That(f.Provider.Players.Select(r => r.Key.Skin), Is.EqualTo(new[] { SkinId.Punk, SkinId.Punk, SkinId.Alternate }));
             Assert.That(Player(SimulationOf(f.Controller)).Get<ViewSkin>().Id, Is.EqualTo(SkinId.Alternate));
-            f.Controller.RequestRestart();
+            TestGameplay.Commands(f.Controller).RequestRestart();
             f.Controller.Tick(0f);
             f.Provider.Players[3].Source.TrySetException(new InvalidOperationException("planned restart character failure"));
             f.Controller.Tick(0f);
-            Assert.That(f.Controller.Phase, Is.EqualTo(GameplayPhase.CharacterFailed));
-            Assert.That(f.Controller.SelectedCharacter, Is.EqualTo(SkinId.Alternate));
-            Assert.That(f.Controller.RemainingSeconds, Is.EqualTo(60f));
+            Assert.That(TestGameplay.Status(f.Controller).Phase, Is.EqualTo(GameplayPhase.CharacterFailed));
+            Assert.That(TestGameplay.Status(f.Controller).SelectedCharacter, Is.EqualTo(SkinId.Alternate));
+            Assert.That(TestGameplay.Status(f.Controller).RemainingSeconds, Is.EqualTo(60f));
             Confirm(f, SkinId.Punk);
             f.Provider.Players[4].Source.TrySetResult(f.Provider.Prefab);
             f.Controller.Tick(0f);
-            Assert.That(f.Controller.Phase, Is.EqualTo(GameplayPhase.Playing));
+            Assert.That(TestGameplay.Status(f.Controller).Phase, Is.EqualTo(GameplayPhase.Playing));
         }
 
         [UnityTest]
@@ -151,10 +151,10 @@ namespace Sokoban.Tests.PlayMode
                 EnterSelection(f);
                 Confirm(f, SkinId.Punk);
                 Request obsolete = f.Provider.Players[0];
-                f.Controller.RequestRestart();
+                TestGameplay.Commands(f.Controller).RequestRestart();
                 f.Controller.Tick(0f);
                 Assert.That(obsolete.Token.IsCancellationRequested, Is.True);
-                Assert.That(f.Controller.Phase, Is.EqualTo(GameplayPhase.BindingViews));
+                Assert.That(TestGameplay.Status(f.Controller).Phase, Is.EqualTo(GameplayPhase.BindingViews));
                 Assert.That(f.Provider.Players.Count, Is.EqualTo(2));
                 if (fail)
                 {
@@ -169,7 +169,7 @@ namespace Sokoban.Tests.PlayMode
                 Assert.That(Player(SimulationOf(f.Controller)).Has<TransformComponent>(), Is.False);
                 f.Provider.Players[1].Source.TrySetResult(f.Provider.Prefab);
                 f.Controller.Tick(0f);
-                Assert.That(f.Controller.Phase, Is.EqualTo(GameplayPhase.Playing));
+                Assert.That(TestGameplay.Status(f.Controller).Phase, Is.EqualTo(GameplayPhase.Playing));
                 Assert.That(ActiveBoard(f).Cast<Transform>().Count(t => t.name.StartsWith("Player")), Is.EqualTo(1));
             }
         }
@@ -200,63 +200,136 @@ namespace Sokoban.Tests.PlayMode
         }
 
         [Test]
-        public void NewEntriesAndReplaySelectAgainWhileRestartsReuseConfirmedCharacter()
+        public void OneSelectionSurvivesLevelEntriesRestartsAndTimeoutWhilePlayAgainRequiresConfirmation()
         {
             Fixture f = Create();
             f.Provider.Immediate = true;
             EnterSelection(f);
             Confirm(f, SkinId.Alternate);
-            Assert.That(f.Controller.Phase, Is.EqualTo(GameplayPhase.Playing));
+            Assert.That(TestGameplay.Status(f.Controller).Phase, Is.EqualTo(GameplayPhase.Playing));
             f.Input.NextLevelPressed = true;
             f.Controller.Tick(0f);
             f.Input.NextLevelPressed = false;
+            f.Input.IsNeutral = false;
+            f.Input.Move = MoveCommand.Right;
+            GameplaySnapshot awaitingRelease = SimulationOf(f.Controller).CaptureSnapshot();
+            int reads = f.Input.Reads;
+            f.Controller.Tick(10f);
+            Assert.That(TestGameplay.Status(f.Controller).Phase, Is.EqualTo(GameplayPhase.BindingViews));
+            Assert.That(SimulationOf(f.Controller).CaptureSnapshot(), Is.EqualTo(awaitingRelease));
+            Assert.That(f.Input.Reads, Is.EqualTo(reads));
+            f.Input.Move = default;
+            f.Input.IsNeutral = true;
             f.Controller.Tick(0f);
-            Assert.That(f.Controller.Phase, Is.EqualTo(GameplayPhase.SelectingCharacter));
-            Assert.That(f.Controller.SelectedCharacter, Is.EqualTo(SkinId.Alternate));
-            Assert.That(Player(SimulationOf(f.Controller)).Has<TransformComponent>(), Is.False);
-            Confirm(f, SkinId.Punk);
-            f.Controller.RequestRestart();
+            Assert.That(TestGameplay.Status(f.Controller).Phase, Is.EqualTo(GameplayPhase.Playing));
+            Assert.That(SimulationOf(f.Controller).CaptureSnapshot(), Is.EqualTo(awaitingRelease));
+            Assert.That(TestGameplay.Status(f.Controller).SelectedCharacter, Is.EqualTo(SkinId.Alternate));
+            Assert.That(Player(SimulationOf(f.Controller)).Has<TransformComponent>(), Is.True);
+            Assert.That(TestGameplay.Commands(f.Controller).CanChooseCharacter, Is.False);
+            TestGameplay.Commands(f.Controller).RequestRestart();
             f.Controller.Tick(0f);
             f.Controller.Tick(0f);
-            Assert.That(f.Controller.Phase, Is.EqualTo(GameplayPhase.Playing));
-            Assert.That(Player(SimulationOf(f.Controller)).Get<ViewSkin>().Id, Is.EqualTo(SkinId.Punk));
+            Assert.That(TestGameplay.Status(f.Controller).Phase, Is.EqualTo(GameplayPhase.Playing));
+            Assert.That(Player(SimulationOf(f.Controller)).Get<ViewSkin>().Id, Is.EqualTo(SkinId.Alternate));
             f.Controller.Tick(60f);
             f.Controller.Tick(0f);
-            Assert.That(f.Controller.Phase, Is.EqualTo(GameplayPhase.Playing));
-            Assert.That(f.Controller.RemainingSeconds, Is.EqualTo(60f));
+            Assert.That(TestGameplay.Status(f.Controller).Phase, Is.EqualTo(GameplayPhase.Playing));
+            Assert.That(TestGameplay.Status(f.Controller).RemainingSeconds, Is.EqualTo(60f));
             SimulationOf(f.Controller).World.Single(e => e.Has<BoxTag>()).Set(new GridPosition(5, 1));
             f.Controller.Tick(0f);
             f.Controller.Tick(0.75f);
-            Assert.That(f.Controller.Phase, Is.EqualTo(GameplayPhase.Finished));
-            f.Controller.RequestRestart();
+            Assert.That(TestGameplay.Status(f.Controller).Phase, Is.EqualTo(GameplayPhase.Finished));
+            TestGameplay.Commands(f.Controller).RequestRestart();
             f.Controller.Tick(0f);
             f.Controller.Tick(0f);
-            Assert.That(f.Controller.Phase, Is.EqualTo(GameplayPhase.SelectingCharacter));
-            Assert.That(f.Controller.SelectedCharacter, Is.EqualTo(SkinId.Punk));
-            Assert.That(f.Controller.Results, Is.Empty);
+            Assert.That(TestGameplay.Status(f.Controller).Phase, Is.EqualTo(GameplayPhase.SelectingCharacter));
+            Assert.That(TestGameplay.Status(f.Controller).SelectedCharacter, Is.EqualTo(SkinId.Alternate));
+            Assert.That(TestGameplay.Status(f.Controller).Results, Is.Empty);
         }
 
         [Test]
-        public void AutomaticProgressionUsesTheCurrentCatalogAndFallsBackWhenThePreviousCharacterIsAbsent()
+        public void LaterEntryNeverFallsBackWhenTheConfirmedCatalogEntryIsRemoved()
         {
             Fixture f = Create();
             f.Provider.Immediate = true;
             EnterSelection(f);
             Confirm(f, SkinId.Alternate);
-            f.Data.Views.Entries.Single().Skins.RemoveAll(entry => entry.Skin == SkinId.Alternate);
+            List<ViewCatalog.SkinEntry> skins = f.Data.Views.Entries.Single().Skins;
+            ViewCatalog.SkinEntry confirmed = skins.Single(entry => entry.Skin == SkinId.Alternate);
+            skins.Remove(confirmed);
+            f.Input.NextLevelPressed = true;
+            f.Controller.Tick(0f);
+            f.Input.NextLevelPressed = false;
+            Assert.That(TestGameplay.Status(f.Controller).Phase, Is.EqualTo(GameplayPhase.CharacterFailed));
+            Assert.That(TestGameplay.Commands(f.Controller).CanChooseCharacter, Is.False);
+            Assert.That(TestGameplay.Commands(f.Controller).CanConfirmCharacter, Is.True);
+            Assert.That(f.Provider.Players.Count, Is.EqualTo(1), "No Default prefab request is allowed for a missing confirmed character.");
+            TestGameplay.Commands(f.Controller).RequestCharacter(SkinId.Punk);
+            TestGameplay.Commands(f.Controller).RequestConfirmCharacter();
+            f.Controller.Tick(0f);
+            Assert.That(TestGameplay.Status(f.Controller).Phase, Is.EqualTo(GameplayPhase.CharacterFailed));
+            Assert.That(TestGameplay.Status(f.Controller).SelectedCharacter, Is.EqualTo(SkinId.Alternate));
+            skins.Add(confirmed);
+            TestGameplay.Commands(f.Controller).RequestConfirmCharacter();
+            f.Controller.Tick(0f);
+            Assert.That(TestGameplay.Status(f.Controller).Phase, Is.EqualTo(GameplayPhase.Playing));
+            Assert.That(f.Provider.Players.Select(request => request.Key.Skin),
+                Is.EqualTo(new[] { SkinId.Alternate, SkinId.Alternate }));
+            for (int move = 0; move < 3; move++)
+            {
+                f.Input.Move = MoveCommand.Right;
+                f.Controller.Tick(0.16f);
+            }
+            f.Input.Move = default;
+            skins.Remove(confirmed);
+            LogAssert.Expect(LogType.Exception, new System.Text.RegularExpressions.Regex("recorded character is unavailable"));
+            TestGameplay.Commands(f.Controller).RequestWatchReplay();
+            f.Controller.Tick(0f);
+            Assert.That(TestGameplay.Status(f.Controller).Phase, Is.EqualTo(GameplayPhase.ReplayFailed));
+            Assert.That(f.Provider.Players.Count, Is.EqualTo(2));
+            TestGameplay.Commands(f.Controller).RequestBackFromReplay();
+            f.Controller.Tick(0f);
+            Assert.That(TestGameplay.Status(f.Controller).Phase, Is.EqualTo(GameplayPhase.Finished));
+            Assert.That(TestGameplay.Status(f.Controller).Results.Count, Is.EqualTo(1));
+            skins.Add(confirmed);
+        }
+
+        [UnityTest]
+        public IEnumerator LaterCharacterFailureRetriesTheConfirmedSkinWithoutReopeningChoices()
+        {
+            Fixture f = Create();
+            f.Provider.Immediate = true;
+            EnterSelection(f);
+            Confirm(f, SkinId.Alternate);
             SimulationOf(f.Controller).World.Single(e => e.Has<BoxTag>()).Set(new GridPosition(5, 1));
             f.Controller.Tick(0f);
-            Assert.That(f.Controller.Phase, Is.EqualTo(GameplayPhase.Completed));
-            f.Controller.Tick(0.75f);
+            Assert.That(TestGameplay.Status(f.Controller).Phase, Is.EqualTo(GameplayPhase.Completed));
+            f.Provider.Immediate = false;
+            TestGameplay.Commands(f.Controller).RequestNextLevel();
             f.Controller.Tick(0f);
-            Assert.That(f.Controller.Phase, Is.EqualTo(GameplayPhase.SelectingCharacter));
-            Assert.That(f.Controller.LevelNumber, Is.EqualTo(2));
-            Assert.That(f.Controller.Characters, Is.EqualTo(new[] { SkinId.Default, SkinId.Punk }));
-            Assert.That(f.Controller.SelectedCharacter, Is.EqualTo(SkinId.Default));
-            Assert.That(Player(SimulationOf(f.Controller)).Has<TransformComponent>(), Is.False);
-            Confirm(f, (SkinId)999);
-            Assert.That(f.Controller.Phase, Is.EqualTo(GameplayPhase.Playing));
-            Assert.That(f.Provider.Players.Select(r => r.Key.Skin), Is.EqualTo(new[] { SkinId.Alternate, SkinId.Default }));
+            Request pending = f.Provider.Players.Last();
+            Assert.That(pending.Key.Skin, Is.EqualTo(SkinId.Alternate));
+            pending.Source.TrySetException(new InvalidOperationException("later character failure"));
+            yield return null;
+            f.Controller.Tick(0f);
+            Assert.That(TestGameplay.Status(f.Controller).Phase, Is.EqualTo(GameplayPhase.CharacterFailed));
+            Assert.That(TestGameplay.Commands(f.Controller).CanChooseCharacter, Is.False);
+            Assert.That(TestGameplay.Commands(f.Controller).CanConfirmCharacter, Is.True);
+            TestGameplay.Commands(f.Controller).RequestCharacter(SkinId.Punk);
+            TestGameplay.Commands(f.Controller).RequestConfirmCharacter();
+            f.Controller.Tick(0f);
+            Request retry = f.Provider.Players.Last();
+            Assert.That(retry, Is.Not.SameAs(pending));
+            Assert.That(retry.Key.Skin, Is.EqualTo(SkinId.Alternate));
+            retry.Source.TrySetResult(f.Provider.Prefab);
+            yield return null;
+            f.Input.IsNeutral = false;
+            f.Controller.Tick(0f);
+            Assert.That(TestGameplay.Status(f.Controller).Phase, Is.EqualTo(GameplayPhase.BindingCharacter));
+            f.Input.IsNeutral = true;
+            f.Controller.Tick(0f);
+            Assert.That(TestGameplay.Status(f.Controller).Phase, Is.EqualTo(GameplayPhase.Playing));
+            Assert.That(TestGameplay.Status(f.Controller).SelectedCharacter, Is.EqualTo(SkinId.Alternate));
         }
 
         [Test]
@@ -269,14 +342,249 @@ namespace Sokoban.Tests.PlayMode
             f.Input.NextLevelPressed = true;
             f.Input.UndoPressed = true;
             f.Controller.Tick(10f);
-            Assert.That(f.Controller.Phase, Is.EqualTo(GameplayPhase.SelectingCharacter));
+            Assert.That(TestGameplay.Status(f.Controller).Phase, Is.EqualTo(GameplayPhase.SelectingCharacter));
             Assert.That(f.Input.Reads, Is.Zero);
-            Assert.That(f.Controller.LevelNumber, Is.EqualTo(1));
-            f.Controller.RequestConfirmCharacter();
-            f.Controller.RequestRestart();
+            Assert.That(TestGameplay.Status(f.Controller).LevelNumber, Is.EqualTo(1));
+            TestGameplay.Commands(f.Controller).RequestConfirmCharacter();
+            TestGameplay.Commands(f.Controller).RequestRestart();
             f.Controller.Tick(0f);
             Assert.That(f.Provider.Players, Is.Empty);
-            Assert.That(f.Controller.Phase, Is.EqualTo(GameplayPhase.BindingViews));
+            Assert.That(TestGameplay.Status(f.Controller).Phase, Is.EqualTo(GameplayPhase.BindingViews));
+        }
+
+        [Test]
+        public void RepeatedWatchingRestoresTheOriginalAttemptAndResultsThenNextKeepsTheSkin()
+        {
+            Fixture f = Create();
+            f.Provider.Immediate = true;
+            EnterSelection(f);
+            Confirm(f, SkinId.Alternate);
+            Complete();
+            Simulation original = SimulationOf(f.Controller);
+            GameplaySnapshot completed = original.CaptureSnapshot();
+            int recordedInputs = original.ExportRecording().Inputs.Count;
+            Transform completedRoot = f.Root.GetChild(0);
+            string background = TestGameplay.Status(f.Controller).BackgroundName;
+            int reads = f.Input.Reads;
+            for (int watch = 0; watch < 2; watch++)
+            {
+                TestGameplay.Commands(f.Controller).RequestWatchReplay();
+                TestGameplay.Commands(f.Controller).RequestWatchReplay();
+                f.Controller.Tick(0f);
+                Assert.That(TestGameplay.Status(f.Controller).Phase, Is.EqualTo(GameplayPhase.ReplayLoading));
+                Assert.That(completedRoot.gameObject.activeSelf, Is.False);
+                f.Controller.Tick(0f);
+                Assert.That(TestGameplay.Status(f.Controller).Phase, Is.EqualTo(GameplayPhase.Replaying));
+                TestGameplay.Commands(f.Controller).RequestToggleReplayPause();
+                TestGameplay.Commands(f.Controller).RequestToggleReplayPause();
+                f.Controller.Tick(10f);
+                Assert.That(TestGameplay.Status(f.Controller).Phase, Is.EqualTo(GameplayPhase.ReplayPaused));
+                f.Input.Move = MoveCommand.Left;
+                f.Input.RestartPressed = f.Input.NextLevelPressed = f.Input.UndoPressed = true;
+                Assert.That(TestGameplay.Commands(f.Controller).CanRestart || TestGameplay.Commands(f.Controller).CanUndo || TestGameplay.Commands(f.Controller).CanHint
+                            || TestGameplay.Commands(f.Controller).CanNextLevel || TestGameplay.Commands(f.Controller).CanNextBackground, Is.False);
+                TestGameplay.Commands(f.Controller).RequestRestart();
+                TestGameplay.Commands(f.Controller).RequestNextLevel();
+                f.Controller.RequestNextSkin();
+                TestGameplay.Commands(f.Controller).RequestNextBackground();
+                TestGameplay.Commands(f.Controller).RequestUndo();
+                TestGameplay.Commands(f.Controller).RequestHint();
+                f.Controller.Tick(10f);
+                Assert.That(TestGameplay.Status(f.Controller).Phase, Is.EqualTo(GameplayPhase.ReplayPaused));
+                Assert.That(f.Input.Reads, Is.EqualTo(reads));
+                TestGameplay.Commands(f.Controller).RequestToggleReplayPause();
+                f.Controller.Tick(1f);
+                Assert.That(TestGameplay.Status(f.Controller).Phase, Is.EqualTo(GameplayPhase.ReplayFinished));
+                f.Controller.Tick(100f);
+                Assert.That(TestGameplay.Status(f.Controller).Phase, Is.EqualTo(GameplayPhase.ReplayFinished));
+                TestGameplay.Commands(f.Controller).RequestBackFromReplay();
+                f.Controller.Tick(0f);
+                Assert.That(TestGameplay.Status(f.Controller).Phase, Is.EqualTo(GameplayPhase.Completed));
+                Assert.That(completedRoot.gameObject.activeSelf, Is.True);
+                Assert.That(SimulationOf(f.Controller), Is.SameAs(original));
+                Assert.That(original.CaptureSnapshot(), Is.EqualTo(completed));
+                Assert.That(original.ExportRecording().Inputs.Count, Is.EqualTo(recordedInputs));
+                Assert.That(TestGameplay.Status(f.Controller).Results.Count, Is.EqualTo(1));
+                Assert.That(TestGameplay.Status(f.Controller).BackgroundName, Is.EqualTo(background));
+                f.Input.Move = default;
+                f.Input.RestartPressed = f.Input.NextLevelPressed = f.Input.UndoPressed = false;
+            }
+            TestGameplay.Commands(f.Controller).RequestNextLevel();
+            f.Controller.Tick(0f);
+            f.Controller.Tick(0f);
+            Assert.That(TestGameplay.Status(f.Controller).Phase, Is.EqualTo(GameplayPhase.Playing));
+            Assert.That(TestGameplay.Status(f.Controller).LevelNumber, Is.EqualTo(2));
+            Assert.That(Player(SimulationOf(f.Controller)).Get<ViewSkin>().Id, Is.EqualTo(SkinId.Alternate));
+            Complete();
+            Assert.That(TestGameplay.Status(f.Controller).Phase, Is.EqualTo(GameplayPhase.Finished));
+            TestGameplay.Commands(f.Controller).RequestWatchReplay();
+            f.Controller.Tick(0f);
+            f.Controller.Tick(0f);
+            f.Controller.Tick(1f);
+            TestGameplay.Commands(f.Controller).RequestBackFromReplay();
+            f.Controller.Tick(0f);
+            Assert.That(TestGameplay.Status(f.Controller).Phase, Is.EqualTo(GameplayPhase.Finished));
+            Assert.That(TestGameplay.Status(f.Controller).Results.Count, Is.EqualTo(2));
+            TestGameplay.Commands(f.Controller).RequestRestart();
+            f.Controller.Tick(0f);
+            f.Controller.Tick(0f);
+            Assert.That(TestGameplay.Status(f.Controller).Phase, Is.EqualTo(GameplayPhase.SelectingCharacter));
+            Assert.That(TestGameplay.Status(f.Controller).SelectedCharacter, Is.EqualTo(SkinId.Alternate));
+            Assert.That(TestGameplay.Commands(f.Controller).CanWatchReplay, Is.False);
+            Assert.That(TestGameplay.Status(f.Controller).Results, Is.Empty);
+
+            void Complete()
+            {
+                for (int move = 0; move < 3; move++)
+                {
+                    f.Input.Move = MoveCommand.Right;
+                    f.Controller.Tick(0.16f);
+                }
+                f.Input.Move = default;
+            }
+        }
+
+        [Test]
+        public void CoincidentNavigationRequestsPreserveCompletionAndReplayPriorities()
+        {
+            Fixture f = Create();
+            f.Provider.Immediate = true;
+            EnterSelection(f);
+            Confirm(f, SkinId.Alternate);
+            Complete();
+
+            TestGameplay.Commands(f.Controller).RequestWatchReplay();
+            TestGameplay.Commands(f.Controller).RequestNextLevel();
+            f.Controller.Tick(0f);
+            Assert.That(TestGameplay.Status(f.Controller).LevelNumber, Is.EqualTo(2));
+            Assert.That(TestGameplay.Status(f.Controller).Phase, Is.EqualTo(GameplayPhase.BindingViews));
+            Assert.That(TestGameplay.Commands(f.Controller).CanBackFromReplay, Is.False);
+            Assert.That(f.Provider.Players.Count, Is.EqualTo(2));
+            Assert.That(TestGameplay.Status(f.Controller).Results.Count, Is.EqualTo(1));
+            f.Controller.Tick(0f);
+            Assert.That(TestGameplay.Status(f.Controller).Phase, Is.EqualTo(GameplayPhase.Playing));
+            Complete();
+            Assert.That(TestGameplay.Status(f.Controller).Phase, Is.EqualTo(GameplayPhase.Finished));
+            Simulation original = SimulationOf(f.Controller);
+            GameplaySnapshot completed = original.CaptureSnapshot();
+            int recordedInputs = original.ExportRecording().Inputs.Count;
+            string background = TestGameplay.Status(f.Controller).BackgroundName;
+
+            TestGameplay.Commands(f.Controller).RequestRestart();
+            TestGameplay.Commands(f.Controller).RequestWatchReplay();
+            f.Controller.Tick(0f);
+            Assert.That(TestGameplay.Status(f.Controller).Phase, Is.EqualTo(GameplayPhase.ReplayLoading));
+            Assert.That(TestGameplay.Status(f.Controller).LevelNumber, Is.EqualTo(2));
+            Assert.That(TestGameplay.Status(f.Controller).Results.Count, Is.EqualTo(2));
+            f.Controller.Tick(0f);
+            Assert.That(TestGameplay.Status(f.Controller).Phase, Is.EqualTo(GameplayPhase.Replaying));
+
+            TestGameplay.Commands(f.Controller).RequestToggleReplayPause();
+            TestGameplay.Commands(f.Controller).RequestBackFromReplay();
+            f.Controller.Tick(0.16f);
+            Assert.That(TestGameplay.Status(f.Controller).Phase, Is.EqualTo(GameplayPhase.Finished));
+            Assert.That(SimulationOf(f.Controller), Is.SameAs(original));
+            Assert.That(original.CaptureSnapshot(), Is.EqualTo(completed));
+            Assert.That(original.ExportRecording().Inputs.Count, Is.EqualTo(recordedInputs));
+            Assert.That(TestGameplay.Status(f.Controller).BackgroundName, Is.EqualTo(background));
+            Assert.That(TestGameplay.Status(f.Controller).Results.Count, Is.EqualTo(2));
+
+            TestGameplay.Commands(f.Controller).RequestWatchReplay();
+            f.Controller.Tick(0f);
+            f.Controller.Tick(0f);
+            Assert.That(TestGameplay.Status(f.Controller).Phase, Is.EqualTo(GameplayPhase.Replaying), "The dropped Pause request must not reach another replay.");
+            TestGameplay.Commands(f.Controller).RequestBackFromReplay();
+            f.Controller.Tick(0f);
+            Assert.That(TestGameplay.Status(f.Controller).Results.Count, Is.EqualTo(2));
+
+            void Complete()
+            {
+                for (int move = 0; move < 3; move++)
+                {
+                    f.Input.Move = MoveCommand.Right;
+                    f.Controller.Tick(0.16f);
+                }
+                f.Input.Move = default;
+            }
+        }
+
+        [UnityTest]
+        public IEnumerator BackWorksDuringReplayLoadingAndFailureAndRejectsLateCharacterResults()
+        {
+            foreach (bool failure in new[] { false, true })
+            {
+                Fixture f = Create();
+                f.Provider.Immediate = true;
+                EnterSelection(f);
+                Confirm(f, SkinId.Punk);
+                for (int move = 0; move < 3; move++)
+                {
+                    f.Input.Move = MoveCommand.Right;
+                    f.Controller.Tick(0.16f);
+                }
+                f.Input.Move = default;
+                Transform original = f.Root.GetChild(0);
+                f.Provider.Immediate = false;
+                TestGameplay.Commands(f.Controller).RequestWatchReplay();
+                f.Controller.Tick(0f);
+                Request request = f.Provider.Players.Last();
+                Assert.That(request.Key.Skin, Is.EqualTo(SkinId.Punk));
+                if (failure)
+                {
+                    request.Source.TrySetException(new InvalidOperationException("controlled replay character failure"));
+                    yield return null;
+                    LogAssert.Expect(LogType.Exception, new System.Text.RegularExpressions.Regex("Replay views could not be loaded"));
+                    f.Controller.Tick(0f);
+                    Assert.That(TestGameplay.Status(f.Controller).Phase, Is.EqualTo(GameplayPhase.ReplayFailed));
+                }
+                TestGameplay.Commands(f.Controller).RequestBackFromReplay();
+                f.Controller.Tick(0f);
+                if (failure == false)
+                {
+                    Assert.That(request.Token.IsCancellationRequested, Is.True);
+                }
+                Assert.That(TestGameplay.Status(f.Controller).Phase, Is.EqualTo(GameplayPhase.Completed));
+                Assert.That(original.gameObject.activeSelf, Is.True);
+                if (failure == false)
+                {
+                    request.Source.TrySetResult(f.Provider.Prefab);
+                }
+                yield return null;
+                Assert.That(f.Root.childCount, Is.EqualTo(1));
+                Assert.That(TestGameplay.Status(f.Controller).Results.Count, Is.EqualTo(1));
+                Assert.That(TestGameplay.Commands(f.Controller).CanWatchReplay, Is.True);
+            }
+        }
+
+        [UnityTest]
+        public IEnumerator SceneOwnerDisposalCancelsReplayBindingAndObservesItsLateFailure()
+        {
+            Fixture f = Create();
+            f.Provider.Immediate = true;
+            EnterSelection(f);
+            Confirm(f, SkinId.Alternate);
+            for (int move = 0; move < 3; move++)
+            {
+                f.Input.Move = MoveCommand.Right;
+                f.Controller.Tick(0.16f);
+            }
+            f.Input.Move = default;
+            Simulation original = SimulationOf(f.Controller);
+            int disposed = 0;
+            using var observer = original.World.SubscribeWorldDisposed(_ => disposed++);
+            f.Provider.Immediate = false;
+            TestGameplay.Commands(f.Controller).RequestWatchReplay();
+            f.Controller.Tick(0f);
+            Request request = f.Provider.Players.Last();
+            f.Controller.Dispose();
+            _controllers.Remove(f.Controller);
+            Assert.That(disposed, Is.EqualTo(1));
+            Assert.That(request.Token.IsCancellationRequested, Is.True);
+            request.Source.TrySetException(new InvalidOperationException("obsolete scene replay failure"));
+            yield return null;
+            Assert.That(f.Root.childCount, Is.Zero);
+            Assert.That(TestGameplay.Commands(f.Controller).CanWatchReplay, Is.False);
+            LogAssert.NoUnexpectedReceived();
         }
 
         private Fixture Create()
@@ -291,8 +599,10 @@ namespace Sokoban.Tests.PlayMode
             var catalog = ScriptableObject.CreateInstance<BackgroundCatalog>();
             _objects.Add(catalog);
             var backgrounds = TestBackgrounds.Create(data, Object("Background"), catalog);
-            var factory = new LevelRunFactory(new LevelRoot(root), provider, new LevelPopulator(), new SimulationPipelineFactory(), new ViewPipelineFactory());
-            var controller = new GameplayController(input, new Source(), new HintCoordinator(new HintService(new HintSolver()), provider), backgrounds, factory, data);
+            var factory = new LevelRunFactory(new LevelRoot(root), provider, new LevelPopulator(),
+                viewPipelineFactory: new ViewPipelineFactory(),
+                simulationPipelineFactory: new SimulationPipelineFactory());
+            var controller = TestGameplay.Create(input, new Source(), new HintCoordinator(new HintService(new HintSolver()), provider), backgrounds, factory, data);
             _controllers.Add(controller);
             return new Fixture(controller, provider, input, root, data);
         }
@@ -317,13 +627,13 @@ namespace Sokoban.Tests.PlayMode
         {
             f.Controller.Initialize();
             f.Controller.Tick(0f);
-            Assert.That(f.Controller.Phase, Is.EqualTo(GameplayPhase.SelectingCharacter));
+            Assert.That(TestGameplay.Status(f.Controller).Phase, Is.EqualTo(GameplayPhase.SelectingCharacter));
         }
 
         private static void Confirm(Fixture f, SkinId skin)
         {
-            f.Controller.RequestCharacter(skin);
-            f.Controller.RequestConfirmCharacter();
+            TestGameplay.Commands(f.Controller).RequestCharacter(skin);
+            TestGameplay.Commands(f.Controller).RequestConfirmCharacter();
             f.Controller.Tick(0f);
         }
 

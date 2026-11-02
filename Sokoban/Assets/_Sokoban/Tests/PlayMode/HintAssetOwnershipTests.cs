@@ -33,10 +33,22 @@ namespace Sokoban.Tests.PlayMode
         [UnityTearDown]
         public IEnumerator TearDown()
         {
-            foreach (HintCoordinator hints in _hints) hints.Dispose();
-            foreach (LevelRun run in _runs) run.Dispose();
+            foreach (HintCoordinator hints in _hints)
+            {
+                hints.Dispose();
+            }
+            foreach (LevelRun run in _runs)
+            {
+                run.Dispose();
+            }
             _assets?.Dispose();
-            foreach (GameObject target in _objects) if (target != null) UnityEngine.Object.Destroy(target);
+            foreach (GameObject target in _objects)
+            {
+                if (target != null)
+                {
+                    UnityEngine.Object.Destroy(target);
+                }
+            }
             _hints.Clear();
             _runs.Clear();
             _objects.Clear();
@@ -52,7 +64,8 @@ namespace Sokoban.Tests.PlayMode
             InitializeAssets();
             var root = CreateObject("Shared run parent").transform;
             var factory = new LevelRunFactory(new LevelRoot(root), _assets, new LevelPopulator(),
-                new SimulationPipelineFactory(), new ViewPipelineFactory());
+                viewPipelineFactory: new ViewPipelineFactory(),
+                simulationPipelineFactory: new SimulationPipelineFactory());
             LevelDefinition level = LevelParser.Parse("########\n#@-$--.#\n########");
             LevelRun first = CreateRun(factory, level);
             LevelRun second = CreateRun(factory, level);
@@ -100,7 +113,9 @@ namespace Sokoban.Tests.PlayMode
         {
             InitializeAssets();
             var factory = new LevelRunFactory(new LevelRoot(CreateObject("Retry root").transform), _assets,
-                new LevelPopulator(), new SimulationPipelineFactory(), new ViewPipelineFactory());
+                new LevelPopulator(),
+                viewPipelineFactory: new ViewPipelineFactory(),
+                simulationPipelineFactory: new SimulationPipelineFactory());
             LevelRun run = CreateRun(factory, LevelParser.Parse("########\n#@-$--.#\n########"));
             HintCoordinator hints = CreateHints(new ImmediateService());
             hints.Start(run, GameplayPhase.Playing);
@@ -164,7 +179,10 @@ namespace Sokoban.Tests.PlayMode
                     _arrowLoads.Add(operation);
                     _arrowHandles.Add(handle);
                 }
-                else operation.Finish(_actorPrefab);
+                else
+                {
+                    operation.Finish(_actorPrefab);
+                }
                 return handle;
             });
             _assets = new ViewAssets(new TestStaticData { Views = catalog }, _addressables);

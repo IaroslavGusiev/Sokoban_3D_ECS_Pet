@@ -30,7 +30,10 @@ namespace Sokoban.Tests.PlayMode
         {
             foreach (GameObject target in _objects)
             {
-                if (target != null) UnityEngine.Object.Destroy(target);
+                if (target != null)
+                {
+                    UnityEngine.Object.Destroy(target);
+                }
             }
             _objects.Clear();
             yield return null;
@@ -53,7 +56,10 @@ namespace Sokoban.Tests.PlayMode
             Entity ignored = world.CreateEntity();
             ignored.Set(new GridPosition(4, 4));
             using var binding = new ViewBindingSystem(world, new ViewContext(root, provider, cancellation.Token, 0.16f));
-            for (int i = 0; i < 5; i++) binding.Update(1f);
+            for (int i = 0; i < 5; i++)
+            {
+                binding.Update(1f);
+            }
             Assert.That(provider.Calls, Is.EqualTo(1));
             Assert.That(player.Has<ViewPending>(), Is.True);
             Assert.That(ignored.Has<ViewPending>(), Is.False);

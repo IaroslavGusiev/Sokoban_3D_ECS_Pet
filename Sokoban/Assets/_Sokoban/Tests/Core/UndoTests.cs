@@ -21,7 +21,10 @@ namespace Sokoban.CoreTests
             Entity box = Box(simulation);
             Entity[] entities = simulation.World.ToArray();
             Step(simulation, MoveCommand.Right);
-            if (push) Step(simulation, MoveCommand.Right);
+            if (push)
+            {
+                Step(simulation, MoveCommand.Right);
+            }
             Assert.That(simulation.CanUndo, Is.True);
             Assert.That(simulation.RequestUndo(), Is.True);
             simulation.Tick(0.25f);
@@ -96,9 +99,15 @@ namespace Sokoban.CoreTests
         {
             using var simulation = Create();
             Step(simulation, MoveCommand.Right);
-            if (moveFirst) simulation.Send(MoveCommand.Right);
+            if (moveFirst)
+            {
+                simulation.Send(MoveCommand.Right);
+            }
             simulation.RequestUndo();
-            if (!moveFirst) simulation.Send(MoveCommand.Right);
+            if (!moveFirst)
+            {
+                simulation.Send(MoveCommand.Right);
+            }
             simulation.Tick(0.25f);
             Assert.That(simulation.Result.Moves, Is.Zero);
             Assert.That(Player(simulation).Get<GridPosition>(), Is.EqualTo(new GridPosition(1, 1)));
@@ -143,11 +152,26 @@ namespace Sokoban.CoreTests
             Step(simulation, MoveCommand.Right);
             Entity player = Player(simulation);
             Entity box = Box(simulation);
-            if (fault == "player disabled") player.Disable();
-            if (fault == "player position") player.Set(new GridPosition(99, 99));
-            if (fault == "box position") box.Set(new GridPosition(99, 99));
-            if (fault == "box disabled") box.Disable();
-            if (fault == "position removed") box.Remove<GridPosition>();
+            if (fault == "player disabled")
+            {
+                player.Disable();
+            }
+            if (fault == "player position")
+            {
+                player.Set(new GridPosition(99, 99));
+            }
+            if (fault == "box position")
+            {
+                box.Set(new GridPosition(99, 99));
+            }
+            if (fault == "box disabled")
+            {
+                box.Disable();
+            }
+            if (fault == "position removed")
+            {
+                box.Remove<GridPosition>();
+            }
             Entity obstruction = default;
             if (fault == "destination occupied")
             {
@@ -170,7 +194,10 @@ namespace Sokoban.CoreTests
             player.Enable();
             box.Enable();
             box.Set(new GridPosition(4, 1));
-            if (fault == "destination occupied") obstruction.Dispose();
+            if (fault == "destination occupied")
+            {
+                obstruction.Dispose();
+            }
             simulation.RequestUndo();
             simulation.Tick(0f);
             Assert.That(player.Get<GridPosition>(), Is.EqualTo(new GridPosition(2, 1)));

@@ -13,5 +13,4 @@ MonoBehaviour:
   m_Name: GameplaySettings
   m_EditorClassIdentifier: 
   <LevelTimeLimitSeconds>k__BackingField: 60
-  <CompletionDelaySeconds>k__BackingField: 0.75
   <MoveDurationSeconds>k__BackingField: 0.16

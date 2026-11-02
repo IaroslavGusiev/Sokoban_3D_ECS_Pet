@@ -28,7 +28,15 @@ namespace Sokoban.Presentation
                 .AsSingle();
 
             Container
-                .Bind(typeof(GameplayController), typeof(IInitializable), typeof(ITickable), typeof(IGameplayStatus), typeof(IGameplayCommands))
+                .BindInterfacesAndSelfTo<GameplayStatus>()
+                .AsSingle();
+
+            Container
+                .BindInterfacesAndSelfTo<GameplayCommandInbox>()
+                .AsSingle();
+
+            Container
+                .Bind(typeof(GameplayController), typeof(IInitializable), typeof(ITickable))
                 .To<GameplayController>()
                 .AsSingle();
 

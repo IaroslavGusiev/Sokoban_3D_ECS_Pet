@@ -337,30 +337,30 @@ namespace Sokoban.Tests.PlayMode
             TestCharacterSelection.Tick(controller, 0f);
             f.Service.Requests.Last().Finish(Cube());
             TestCharacterSelection.Tick(controller, 0f);
-            controller.RequestNextBackground();
+            TestGameplay.Commands(controller).RequestNextBackground();
             TestCharacterSelection.Tick(controller, 0f);
             f.Service.Requests.Last().Finish(Cube());
             TestCharacterSelection.Tick(controller, 0f);
-            string chosen = controller.BackgroundName;
+            string chosen = TestGameplay.Status(controller).BackgroundName;
             Cubemap shown = f.Shown;
             int calls = f.Service.Requests.Count;
 
             input.Move = MoveCommand.Right;
             TestCharacterSelection.Tick(controller, 0.16f);
-            controller.RequestUndo();
+            TestGameplay.Commands(controller).RequestUndo();
             TestCharacterSelection.Tick(controller, 0.16f);
             controller.RequestNextSkin();
             TestCharacterSelection.Tick(controller, 0f);
-            controller.RequestRestart();
+            TestGameplay.Commands(controller).RequestRestart();
             TestCharacterSelection.Tick(controller, 0f);
             TestCharacterSelection.Tick(controller, 0f);
             TestCharacterSelection.Tick(controller, 3f);
             TestCharacterSelection.Tick(controller, 0f);
 
-            Assert.That(controller.BackgroundName, Is.EqualTo(chosen));
+            Assert.That(TestGameplay.Status(controller).BackgroundName, Is.EqualTo(chosen));
             Assert.That(f.Shown, Is.SameAs(shown));
             Assert.That(f.Service.Requests.Count, Is.EqualTo(calls));
-            Assert.That(controller.Phase, Is.EqualTo(GameplayPhase.Playing));
+            Assert.That(TestGameplay.Status(controller).Phase, Is.EqualTo(GameplayPhase.Playing));
         }
 
         [Test]
@@ -371,20 +371,20 @@ namespace Sokoban.Tests.PlayMode
             GameplayController controller = Controller(f, input, LevelParser.Parse("#######\n#@-$-.#\n#######"));
             controller.Initialize();
             TestCharacterSelection.Tick(controller, 0f);
-            string chosen = controller.BackgroundName;
+            string chosen = TestGameplay.Status(controller).BackgroundName;
             ControlledBackgroundService.Request pending = f.Service.Requests.Single();
-            controller.RequestRestart();
+            TestGameplay.Commands(controller).RequestRestart();
             TestCharacterSelection.Tick(controller, 0f);
             TestCharacterSelection.Tick(controller, 0f);
             TestCharacterSelection.Tick(controller, 3f);
             TestCharacterSelection.Tick(controller, 0f);
             Assert.That(pending.Token.IsCancellationRequested, Is.False);
-            Assert.That(controller.BackgroundName, Is.EqualTo(chosen));
+            Assert.That(TestGameplay.Status(controller).BackgroundName, Is.EqualTo(chosen));
             Assert.That(f.Service.Requests.Count, Is.EqualTo(1));
             pending.Finish(Cube());
             TestCharacterSelection.Tick(controller, 0f);
             Assert.That(f.Shown, Is.SameAs(pending.Value));
-            Assert.That(controller.BackgroundStatus, Is.EqualTo(BackgroundStatus.Ready));
+            Assert.That(TestGameplay.Status(controller).BackgroundStatus, Is.EqualTo(BackgroundStatus.Ready));
         }
 
         [TestCase(false)]
@@ -399,12 +399,13 @@ namespace Sokoban.Tests.PlayMode
             int next = expected.Next(f.Catalog.Presets.Count);
             controller.Initialize();
             TestCharacterSelection.Tick(controller, 0f);
-            Assert.That(controller.BackgroundName, Is.EqualTo(f.Catalog.Presets[first].Name));
+            Assert.That(TestGameplay.Status(controller).BackgroundName, Is.EqualTo(f.Catalog.Presets[first].Name));
             ControlledBackgroundService.Request old = f.Service.Requests.Single();
             if (progression)
             {
                 input.Move = MoveCommand.Right;
                 TestCharacterSelection.Tick(controller, 0.16f);
+                TestGameplay.Commands(controller).RequestNextLevel();
                 TestCharacterSelection.Tick(controller, 0.1f);
             }
             else
@@ -413,8 +414,8 @@ namespace Sokoban.Tests.PlayMode
                 TestCharacterSelection.Tick(controller, 0f);
                 input.NextLevelPressed = false;
             }
-            Assert.That(controller.LevelNumber, Is.EqualTo(2));
-            Assert.That(controller.BackgroundName, Is.EqualTo(f.Catalog.Presets[next].Name));
+            Assert.That(TestGameplay.Status(controller).LevelNumber, Is.EqualTo(2));
+            Assert.That(TestGameplay.Status(controller).BackgroundName, Is.EqualTo(f.Catalog.Presets[next].Name));
             Assert.That(old.Token.IsCancellationRequested, Is.True);
             old.Finish(Cube());
             TestCharacterSelection.Tick(controller, 0f);
@@ -436,12 +437,12 @@ namespace Sokoban.Tests.PlayMode
             f.Service.Requests.Single().Finish(null, true);
             LogAssert.Expect(LogType.Exception, "InvalidOperationException: planned background failure");
             TestCharacterSelection.Tick(controller, 0f);
-            Assert.That(controller.Phase, Is.EqualTo(GameplayPhase.Playing));
+            Assert.That(TestGameplay.Status(controller).Phase, Is.EqualTo(GameplayPhase.Playing));
             input.Move = MoveCommand.Right;
             TestCharacterSelection.Tick(controller, 0.16f);
-            Assert.That(controller.Moves, Is.EqualTo(1));
-            Assert.That(controller.BackgroundStatus, Is.EqualTo(BackgroundStatus.Failed));
-            Assert.That(controller.CanNextBackground, Is.True);
+            Assert.That(TestGameplay.Status(controller).Moves, Is.EqualTo(1));
+            Assert.That(TestGameplay.Status(controller).BackgroundStatus, Is.EqualTo(BackgroundStatus.Failed));
+            Assert.That(TestGameplay.Commands(controller).CanNextBackground, Is.True);
         }
 
         private Fixture Create(ControlledBackgroundService service = null)
@@ -469,14 +470,16 @@ namespace Sokoban.Tests.PlayMode
 
         private GameplayController Controller(Fixture f, Input input, LevelDefinition level)
         {
-            GameplaySettings settings = TestGameplaySettings.Create(2f, 0f);
+            GameplaySettings settings = TestGameplaySettings.Create(2f);
             _objects.Add(settings);
             f.Data.Gameplay = settings;
             TestCharacterSelection.Configure(f.Data, _objects);
             var provider = new Views(GameObject("View prefab"));
             var factory = new LevelRunFactory(new LevelRoot(GameObject("Run root").transform), provider,
-                new LevelPopulator(), new SimulationPipelineFactory(), new ViewPipelineFactory());
-            var controller = new GameplayController(input, new Source(level), new HintCoordinator(new HintService(new HintSolver()), provider), f.Owner, factory, f.Data);
+                new LevelPopulator(),
+                viewPipelineFactory: new ViewPipelineFactory(),
+                simulationPipelineFactory: new SimulationPipelineFactory());
+            var controller = TestGameplay.Create(input, new Source(level), new HintCoordinator(new HintService(new HintSolver()), provider), f.Owner, factory, f.Data);
             _controllers.Add(controller);
             return controller;
         }

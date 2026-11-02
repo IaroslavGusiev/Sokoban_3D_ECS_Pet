@@ -131,8 +131,14 @@ namespace Sokoban.CoreTests
             source.Send(MoveCommand.Right);
             source.Tick(0.25f);
             source.Send(MoveCommand.Right);
-            if (undo) source.RequestUndo();
-            else source.Send(MoveCommand.Up);
+            if (undo)
+            {
+                source.RequestUndo();
+            }
+            else
+            {
+                source.Send(MoveCommand.Up);
+            }
             SimulationRecording recording = source.ExportRecording();
             Assert.That(recording.Inputs.Last().Kind, Is.EqualTo(undo ? SimulationInputKind.Undo : SimulationInputKind.Move));
             using var replay = new SimulationReplay(recording);
@@ -326,7 +332,10 @@ namespace Sokoban.CoreTests
             World world = replay.Simulation.World;
             int disposals = 0;
             using var disposal = world.SubscribeWorldDisposed(_ => disposals++);
-            if (duringTick) Assert.That(replay.Step(), Is.True);
+            if (duringTick)
+            {
+                Assert.That(replay.Step(), Is.True);
+            }
             using var fault = duringTick
                 ? world.SubscribeComponentChanged<LevelTimer>((in Entity entity, in LevelTimer previous, in LevelTimer current) => throw new InvalidOperationException("planned replay fault"))
                 : world.SubscribeComponentAdded<MoveRequest>((in Entity entity, in MoveRequest request) => throw new InvalidOperationException("planned replay fault"));
@@ -358,7 +367,9 @@ namespace Sokoban.CoreTests
             {
                 Assert.That(replay.Step(), Is.True);
                 if (input.Kind == SimulationInputKind.Tick)
+                {
                     Assert.That(replay.Simulation.CaptureSnapshot(), Is.EqualTo(expectedTicks[tick++]), $"Replayed tick {tick}");
+                }
             }
             Assert.That(tick, Is.EqualTo(expectedTicks.Count));
             Assert.That(replay.IsFinished, Is.True);

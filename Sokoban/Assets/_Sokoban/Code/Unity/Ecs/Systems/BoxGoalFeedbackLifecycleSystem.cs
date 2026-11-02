@@ -69,6 +69,11 @@ namespace Sokoban.Presentation.Ecs.Systems
             {
                 foreach (Entity entity in Set.GetEntities().ToArray())
                 {
+                    // Replay.Step can dispose its World before presentation cleanup runs.
+                    if (entity.World == null || entity.IsAlive == false)
+                    {
+                        continue;
+                    }
                     BoxGoalAnimator animator = entity.Get<BoxGoalFeedbackComponent>().Animator;
                     if (animator != null)
                     {

@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using DefaultEcs;
 using UnityEngine;
 using Sokoban.Core;
@@ -20,6 +21,8 @@ namespace Sokoban.Presentation
         private readonly SystemPipeline _pipeline;
         private readonly CancellationTokenSource _cancellation = new();
         
+        private readonly Dictionary<Animator, float> _pausedAnimators = new();
+
         private HintArrow _hintArrow;
 
         public bool HasBoardFailure
@@ -145,8 +148,35 @@ namespace Sokoban.Presentation
             }
         }
 
+        internal void SetVisible(bool visible) =>
+            _root.gameObject.SetActive(visible);
+
+        internal void SetAnimationPaused(bool paused)
+        {
+            if (paused)
+            {
+                foreach (Animator animator in _root.GetComponentsInChildren<Animator>(true))
+                {
+                    if (_pausedAnimators.TryAdd(animator, animator.speed))
+                    {
+                        animator.speed = 0f;
+                    }
+                }
+                return;
+            }
+            foreach (KeyValuePair<Animator, float> entry in _pausedAnimators)
+            {
+                if (entry.Key != null)
+                {
+                    entry.Key.speed = entry.Value;
+                }
+            }
+            _pausedAnimators.Clear();
+        }
+
         public void Dispose()
         {
+            SetAnimationPaused(false);
             try
             {
                 _cancellation.Cancel();

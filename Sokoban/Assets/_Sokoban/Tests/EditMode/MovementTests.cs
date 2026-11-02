@@ -302,22 +302,34 @@ namespace Sokoban.Tests.EditMode
             using var positionChanges = _world.SubscribeComponentChanged<GridPosition>(
                 (in Entity entity, in GridPosition oldValue, in GridPosition newValue) =>
                 {
-                    if (entity == goal) goalComponentChanges++;
+                    if (entity == goal)
+                    {
+                        goalComponentChanges++;
+                    }
                 });
             using var positionRemovals = _world.SubscribeComponentRemoved<GridPosition>(
                 (in Entity entity, in GridPosition value) =>
                 {
-                    if (entity == goal) goalComponentChanges++;
+                    if (entity == goal)
+                    {
+                        goalComponentChanges++;
+                    }
                 });
             using var tagChanges = _world.SubscribeComponentChanged<GoalTag>(
                 (in Entity entity, in GoalTag oldValue, in GoalTag newValue) =>
                 {
-                    if (entity == goal) goalComponentChanges++;
+                    if (entity == goal)
+                    {
+                        goalComponentChanges++;
+                    }
                 });
             using var tagRemovals = _world.SubscribeComponentRemoved<GoalTag>(
                 (in Entity entity, in GoalTag value) =>
                 {
-                    if (entity == goal) goalComponentChanges++;
+                    if (entity == goal)
+                    {
+                        goalComponentChanges++;
+                    }
                 });
 
             Assert.That(ExecuteMove(_world, _movement, MoveCommand.Right), Is.True);

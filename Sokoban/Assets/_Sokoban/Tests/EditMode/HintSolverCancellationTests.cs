@@ -18,7 +18,10 @@ namespace Sokoban.Tests.EditMode
             var expansionCount = 0;
             Task<HintResult> task = Task.Run(() => new HintSolver().Solve(board, 100_000, cancellation.Token, () =>
             {
-                if (Interlocked.Increment(ref expansionCount) != 3) return;
+                if (Interlocked.Increment(ref expansionCount) != 3)
+                {
+                    return;
+                }
                 expanded.Set();
                 resume.Wait();
             }), cancellation.Token);

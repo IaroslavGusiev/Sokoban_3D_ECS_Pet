@@ -19,7 +19,10 @@ namespace Sokoban.Tests.PlayMode
         [TearDown]
         public void TearDown()
         {
-            foreach (ScriptableObject asset in _assets) UnityEngine.Object.DestroyImmediate(asset);
+            foreach (ScriptableObject asset in _assets)
+            {
+                UnityEngine.Object.DestroyImmediate(asset);
+            }
             _assets.Clear();
         }
 
@@ -158,8 +161,14 @@ namespace Sokoban.Tests.PlayMode
         public void MissingOrDuplicateConfig_ReleasesBatchAndAllowsRetry(int index, bool duplicate)
         {
             IList<ScriptableObject> invalid = Configs();
-            if (duplicate) invalid.Add(invalid[index]);
-            else invalid.RemoveAt(index);
+            if (duplicate)
+            {
+                invalid.Add(invalid[index]);
+            }
+            else
+            {
+                invalid.RemoveAt(index);
+            }
             int loads = 0;
             var service = new TestAddressablesService(loadLabel: (_, _) =>
                 Addressables.ResourceManager.CreateCompletedOperation(++loads == 1 ? invalid : Configs(), null));

@@ -86,7 +86,10 @@ namespace Sokoban.Tests.Editor
             using var world = new World();
             using var system = new ActorMotionSystem(world, 0.4f);
             system.Update(0f);
-            for (int index = 0; index < 4; index++) Player(world, new GridPosition(index, 2));
+            for (int index = 0; index < 4; index++)
+            {
+                Player(world, new GridPosition(index, 2));
+            }
             Assert.DoesNotThrow(() => system.Update(0f));
             foreach (Entity actor in world)
             {
@@ -227,10 +230,16 @@ namespace Sokoban.Tests.Editor
         public void AllFinishedMoves_AreRemovedInOneBufferedPass(float delta)
         {
             using var world = new World();
-            for (var index = 0; index < 8; index++) Player(world, new GridPosition(index, 0));
+            for (var index = 0; index < 8; index++)
+            {
+                Player(world, new GridPosition(index, 0));
+            }
             using var system = new ActorMotionSystem(world, 0.4f);
             system.Update(0f);
-            foreach (Entity entity in world) entity.Set(new GridPosition(entity.Get<GridPosition>().X, 1));
+            foreach (Entity entity in world)
+            {
+                entity.Set(new GridPosition(entity.Get<GridPosition>().X, 1));
+            }
             system.Update(delta);
             foreach (Entity entity in world)
             {

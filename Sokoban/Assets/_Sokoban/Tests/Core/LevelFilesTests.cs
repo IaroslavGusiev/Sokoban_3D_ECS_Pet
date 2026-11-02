@@ -39,7 +39,10 @@ namespace Sokoban.CoreTests
             var boxes = new HashSet<GridPosition>();
             foreach (Entity entity in simulation.World)
             {
-                if (entity.Has<BoxTag>()) boxes.Add(entity.Get<GridPosition>());
+                if (entity.Has<BoxTag>())
+                {
+                    boxes.Add(entity.Get<GridPosition>());
+                }
             }
 
             Assert.That(boxes, Is.EquivalentTo(level.Goals));
@@ -52,7 +55,9 @@ namespace Sokoban.CoreTests
             {
                 Assert.That(replay.Step(), Is.True);
                 if (input.Kind == SimulationInputKind.Tick)
+                {
                     Assert.That(replay.Simulation.CaptureSnapshot(), Is.EqualTo(snapshots[tick++]));
+                }
             }
             Assert.That(tick, Is.EqualTo(moves.Count));
             Assert.That(replay.Simulation.CaptureSnapshot(), Is.EqualTo(simulation.CaptureSnapshot()));

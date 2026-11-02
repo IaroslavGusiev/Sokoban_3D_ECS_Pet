@@ -35,10 +35,16 @@ namespace Sokoban.Tests.PlayMode
         public IEnumerator TearDown()
         {
             // Simulations own ECS cleanup; view destruction never accesses an entity handle.
-            foreach (Simulation simulation in _simulations) simulation.Dispose();
+            foreach (Simulation simulation in _simulations)
+            {
+                simulation.Dispose();
+            }
             foreach (UnityEngine.Object target in _objects)
             {
-                if (target != null) UnityEngine.Object.Destroy(target);
+                if (target != null)
+                {
+                    UnityEngine.Object.Destroy(target);
+                }
             }
             yield return null;
             _objects.Clear();
@@ -407,9 +413,15 @@ namespace Sokoban.Tests.PlayMode
             TestCharacterSelection.Tick(controller);
             controller.Dispose();
             Assert.That(source.LastToken.IsCancellationRequested, Is.True);
+            IGameplayStatus status = TestGameplay.Status(controller);
+            Assert.That(status.Phase, Is.EqualTo(GameplayPhase.Loading));
+            Assert.That(TestGameplay.Commands(controller).CanRestart, Is.False);
+            float remaining = status.RemainingSeconds;
             pending.TrySetResult(content);
             yield return null;
             Assert.That(SimulationOf(controller), Is.Null);
+            Assert.That(status.Phase, Is.EqualTo(GameplayPhase.Loading));
+            Assert.That(status.RemainingSeconds, Is.EqualTo(remaining));
 
         }
 
@@ -438,7 +450,7 @@ namespace Sokoban.Tests.PlayMode
                 Assert.That(Player(old).Get<GridPosition>(), Is.EqualTo(content.PlayerStart));
 
                 Assert.That(source.LoadCalls, Is.EqualTo(2));
-                Assert.That(controller.Phase, Is.EqualTo(GameplayPhase.LevelFailed));
+                Assert.That(TestGameplay.Status(controller).Phase, Is.EqualTo(GameplayPhase.LevelFailed));
                 LogAssert.Expect(LogType.Exception, new Regex("InvalidOperationException: planned load failure"));
                 input.RestartPressed = true;
                 TestCharacterSelection.Tick(controller);
@@ -529,7 +541,10 @@ namespace Sokoban.Tests.PlayMode
             }
             finally
             {
-                if (keyboard.added) InputSystem.RemoveDevice(keyboard);
+                if (keyboard.added)
+                {
+                    InputSystem.RemoveDevice(keyboard);
+                }
                 InputSystem.settings.editorInputBehaviorInPlayMode = previousEditorInput;
                 InputSystem.settings.backgroundBehavior = previousBackgroundInput;
                 InputSystem.runInBackground = previousRunInBackground;
@@ -548,13 +563,15 @@ namespace Sokoban.Tests.PlayMode
             GameplaySettings settings = TestGameplaySettings.Create();
             _objects.Add(settings);
             var provider = CreateViewProvider();
-            var factory = new LevelRunFactory(new LevelRoot(CreateObject(rootName).transform), provider, new LevelPopulator(), new SimulationPipelineFactory(), new ViewPipelineFactory());
+            var factory = new LevelRunFactory(new LevelRoot(CreateObject(rootName).transform), provider, new LevelPopulator(),
+                viewPipelineFactory: new ViewPipelineFactory(),
+                simulationPipelineFactory: new SimulationPipelineFactory());
             var data = new TestStaticData { Gameplay = settings };
                 TestCharacterSelection.Configure(data, _objects);
             var catalog = ScriptableObject.CreateInstance<BackgroundCatalog>();
             _objects.Add(catalog);
             var backgrounds = TestBackgrounds.Create(data, CreateObject("Background target"), catalog);
-            return new GameplayController(input, source, new HintCoordinator(new HintService(new HintSolver()), provider),
+            return TestGameplay.Create(input, source, new HintCoordinator(new HintService(new HintSolver()), provider),
                 backgrounds, factory, data);
         }
 

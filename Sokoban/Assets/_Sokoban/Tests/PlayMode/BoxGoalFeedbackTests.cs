@@ -35,7 +35,10 @@ namespace Sokoban.Tests.PlayMode
             Time.timeScale = _timeScale;
             foreach (GameObject target in _objects)
             {
-                if (target != null) Object.Destroy(target);
+                if (target != null)
+                {
+                    Object.Destroy(target);
+                }
             }
             _objects.Clear();
             yield return null;
@@ -257,8 +260,14 @@ namespace Sokoban.Tests.PlayMode
             world.Publish(new BoxEnteredGoal(box, box.Get<GridPosition>()));
             pipeline.Update(0f);
             pipeline.Update(0.05f);
-            if (moving) box.Set(new ViewMove(default, default, 0.16f));
-            else box.Set(new GridPosition(4, 1));
+            if (moving)
+            {
+                box.Set(new ViewMove(default, default, 0.16f));
+            }
+            else
+            {
+                box.Set(new GridPosition(4, 1));
+            }
             pipeline.Update(0.01f);
             AssertRestored(animator, visual, baseline, scale);
             Assert.That(box.Has<BoxGoalFeedbackState>(), Is.False);
@@ -383,7 +392,10 @@ namespace Sokoban.Tests.PlayMode
             pipeline.Update(0.05f);
             Vector3 pausedPosition = visual.localPosition;
             Vector3 pausedScale = visual.localScale;
-            for (int frame = 0; frame < 4; frame++) yield return null;
+            for (int frame = 0; frame < 4; frame++)
+            {
+                yield return null;
+            }
             Assert.That(animator.IsPlaying, Is.True);
             Assert.That(visual.localPosition, Is.EqualTo(pausedPosition));
             Assert.That(visual.localScale, Is.EqualTo(pausedScale));
@@ -453,7 +465,10 @@ namespace Sokoban.Tests.PlayMode
             Assert.That(nextAnimator, Is.Not.SameAs(animator));
             Assert.That(nextAnimator.IsPlaying, Is.False);
             Assert.That(nextAnimator.transform.Find("Visual/OccupiedGoalMarker").gameObject.activeSelf, Is.False);
-            for (int frame = 0; frame < 3; frame++) yield return null;
+            for (int frame = 0; frame < 3; frame++)
+            {
+                yield return null;
+            }
             Assert.That(nextAnimator.IsPlaying, Is.False);
         }
 
@@ -468,16 +483,18 @@ namespace Sokoban.Tests.PlayMode
             var provider = new Provider(prefab, CreateObject("Fallback"));
             var input = new Input();
             var source = new HoldingSource();
-            GameplaySettings settings = TestGameplaySettings.Create(completionDelay: 10f);
+            GameplaySettings settings = TestGameplaySettings.Create();
             var catalog = ScriptableObject.CreateInstance<BackgroundCatalog>();
             var characterAssets = new List<UnityEngine.Object>();
             try
             {
-                var factory = new LevelRunFactory(new LevelRoot(parent.transform), provider, new LevelPopulator(), new SimulationPipelineFactory(), new ViewPipelineFactory());
+                var factory = new LevelRunFactory(new LevelRoot(parent.transform), provider, new LevelPopulator(),
+                    viewPipelineFactory: new ViewPipelineFactory(),
+                    simulationPipelineFactory: new SimulationPipelineFactory());
                 var data = new TestStaticData { Gameplay = settings };
                 TestCharacterSelection.Configure(data, characterAssets);
                 var backgrounds = TestBackgrounds.Create(data, CreateObject("Background target"), catalog);
-                using var controller = new GameplayController(input, source, new HintCoordinator(new HintService(new HintSolver()), provider),
+                using var controller = TestGameplay.Create(input, source, new HintCoordinator(new HintService(new HintSolver()), provider),
                     backgrounds, factory, data);
                 controller.Initialize();
                 TestCharacterSelection.Tick(controller, 0f);
@@ -488,10 +505,9 @@ namespace Sokoban.Tests.PlayMode
                 var animator = parent.GetComponentInChildren<BoxGoalAnimator>();
                 Transform visual = animator.transform.Find("Visual");
                 Assert.That(animator.IsPlaying, Is.True);
-                input.NextLevelPressed = true;
+                TestGameplay.Commands(controller).RequestNextLevel();
                 TestCharacterSelection.Tick(controller, 0f);
-                input.NextLevelPressed = false;
-                Assert.That(controller.Phase, Is.EqualTo(GameplayPhase.Loading));
+                Assert.That(TestGameplay.Status(controller).Phase, Is.EqualTo(GameplayPhase.Loading));
                 Vector3 position = visual.localPosition;
                 Vector3 scale = visual.localScale;
                 for (int frame = 0; frame < 4; frame++)
@@ -502,7 +518,7 @@ namespace Sokoban.Tests.PlayMode
                 Assert.That(visual.localPosition, Is.EqualTo(position));
                 Assert.That(visual.localScale, Is.EqualTo(scale));
                 source.Complete();
-                Assert.That(controller.Phase, Is.EqualTo(GameplayPhase.BindingViews));
+                Assert.That(TestGameplay.Status(controller).Phase, Is.EqualTo(GameplayPhase.BindingViews));
                 Assert.That(animator.IsPlaying, Is.False);
                 Assert.That(Tween.GetTweensCount(visual), Is.Zero);
                 Assert.That(visual.localPosition, Is.EqualTo(prefab.transform.Find("Visual").localPosition));

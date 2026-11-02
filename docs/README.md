@@ -5,6 +5,8 @@ Use the current guides for implementation and setup. Source and tests determine 
 | Document | Purpose |
 | --- | --- |
 | [Architecture](ARCHITECTURE.md) | Authoritative description of current boundaries, ownership, and runtime behavior. |
+| [Coding style](CODING_STYLE.md) | Project-owned C# layout and readability conventions. |
+| [Component audit](COMPONENT_AUDIT.md) | Dated component inventory; unimplemented recommendations remain proposals. |
 | [Setup](SETUP.md) | Run GameplayScene, author content using string addresses, and verify changes. |
 | [Level format](../Sokoban/Assets/Levels/LEVEL_FORMAT.md) | Text symbols, parser rules, and solver checks. |
 | [Unity tooling](UNITY_TOOLING.md) | Local Editor connection and CLI usage. |

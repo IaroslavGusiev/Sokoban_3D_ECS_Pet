@@ -24,7 +24,10 @@ namespace Sokoban.Presentation.Ecs.Systems
                 entity.Remove<ViewMove>();
             }
             
-            else entity.Set(move);
+            else
+            {
+                entity.Set(move);
+            }
         }
     }
 }

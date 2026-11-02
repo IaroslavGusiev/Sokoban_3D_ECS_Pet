@@ -26,7 +26,13 @@ namespace Sokoban.Tests.PlayMode
         [UnityTearDown]
         public IEnumerator TearDown()
         {
-            foreach (UnityEngine.Object target in _objects) if (target != null) UnityEngine.Object.Destroy(target);
+            foreach (UnityEngine.Object target in _objects)
+            {
+                if (target != null)
+                {
+                    UnityEngine.Object.Destroy(target);
+                }
+            }
             _objects.Clear();
             yield return null;
         }

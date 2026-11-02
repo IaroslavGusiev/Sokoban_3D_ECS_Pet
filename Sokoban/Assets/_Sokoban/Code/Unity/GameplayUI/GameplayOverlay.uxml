@@ -1,0 +1,93 @@
+<ui:UXML xmlns:ui="UnityEngine.UIElements" editor-extension-mode="False">
+    <ui:Template name="characterSelection" src="project://database/Assets/_Sokoban/Code/Unity/GameplayUI/CharacterSelection.uxml?fileID=9197481963319205126&amp;guid=07fa9c87f8b55a342bd1321d970b44e1&amp;type=3#CharacterSelection" />
+    <ui:Template name="resultRow" src="project://database/Assets/_Sokoban/Code/Unity/GameplayUI/GameplayResultRow.uxml?fileID=9197481963319205126&amp;guid=46f2c463f6a283340a3b81ecd3c08f13&amp;type=3#GameplayResultRow" />
+    <Style src="project://database/Assets/_Sokoban/Code/Unity/GameplayUI/GameplayOverlay.uss?fileID=7433441132597879392&amp;guid=9fcfc8f00ceafc049b8ccecf75d33305&amp;type=3#GameplayOverlay" />
+    <ui:VisualElement name="overlayRoot" picking-mode="Ignore" class="overlay">
+        <ui:VisualElement name="statusPanel" picking-mode="Ignore" class="hud status-side">
+            <ui:VisualElement picking-mode="Ignore" class="level-line">
+                <ui:Label text="LEVEL" picking-mode="Ignore" class="eyebrow" />
+                <ui:Label name="level" text="01 / --" picking-mode="Ignore" class="level" />
+            </ui:VisualElement>
+            <ui:VisualElement picking-mode="Ignore" class="stats">
+                <ui:VisualElement picking-mode="Ignore" class="stat moves-stat">
+                    <ui:Label text="MOVES" picking-mode="Ignore" class="eyebrow" />
+                    <ui:Label name="moves" text="0" picking-mode="Ignore" class="stat-value" />
+                </ui:VisualElement>
+                <ui:VisualElement picking-mode="Ignore" class="stat time-stat">
+                    <ui:Label text="REMAINING" picking-mode="Ignore" class="eyebrow" />
+                    <ui:Label name="remaining" text="--" picking-mode="Ignore" class="stat-value" />
+                </ui:VisualElement>
+            </ui:VisualElement>
+            <ui:Label name="phase" picking-mode="Ignore" class="notice" />
+        </ui:VisualElement>
+        <ui:VisualElement name="completed" picking-mode="Ignore" class="completion-toast">
+            <ui:Label text="Solved" picking-mode="Ignore" class="success-title" />
+            <ui:Label name="completedStats" picking-mode="Ignore" class="completion-stats" />
+            <ui:Button name="nextLevel" class="action primary">
+                <ui:Label text="Next level" picking-mode="Ignore" class="action-title" />
+            </ui:Button>
+            <ui:Button name="watchReplay" text="Watch replay" class="action" />
+        </ui:VisualElement>
+        <ui:ScrollView name="controlsScroll" mode="Vertical" horizontal-scroller-visibility="Hidden" vertical-scroller-visibility="Auto" class="side controls-side">
+            <ui:VisualElement name="controlsPanel" class="controls-panel">
+                <ui:Button name="restart" class="action primary">
+                    <ui:Label name="restartTitle" text="Restart" picking-mode="Ignore" class="action-title" />
+                    <ui:Label text="R" picking-mode="Ignore" class="shortcut" />
+                </ui:Button>
+                <ui:Button name="undo" class="action">
+                    <ui:Label text="Undo" picking-mode="Ignore" class="action-title" />
+                    <ui:Label text="Z" picking-mode="Ignore" class="shortcut" />
+                </ui:Button>
+                <ui:Button name="hint" class="action">
+                    <ui:Label name="hintTitle" text="Hint" picking-mode="Ignore" class="action-title" />
+                </ui:Button>
+                <ui:Label name="hintMessage" picking-mode="Ignore" class="hint-message hidden" />
+                <ui:Label text="Push crates onto targets." picking-mode="Ignore" class="guidance" />
+                <ui:Foldout name="debug" text="Debug" value="false" class="debug">
+                    <ui:Label name="phaseDetail" picking-mode="Ignore" class="detail" />
+                    <ui:VisualElement name="backgroundControls" picking-mode="Ignore">
+                        <ui:Label text="BACKGROUND" picking-mode="Ignore" class="eyebrow" />
+                        <ui:Label name="background" picking-mode="Ignore" class="detail" />
+                        <ui:Button name="nextBackground" class="action debug-action">
+                            <ui:Label name="backgroundTitle" text="Next background" picking-mode="Ignore" class="action-title" />
+                        </ui:Button>
+                    </ui:VisualElement>
+                    <ui:Label text="Move: arrows / WASD&#10;Tab: UI focus&#10;Enter / Space: activate" picking-mode="Ignore" class="detail input-help" />
+                </ui:Foldout>
+            </ui:VisualElement>
+        </ui:ScrollView>
+        <ui:VisualElement name="results" picking-mode="Ignore" class="finished-layer">
+            <ui:VisualElement name="resultsPanel" picking-mode="Ignore" class="result-panel">
+                <ui:Label text="RUN COMPLETE" picking-mode="Ignore" class="eyebrow result-eyebrow" />
+                <ui:Label text="All boards solved" picking-mode="Ignore" class="result-title" />
+                <ui:Label text="Your results, level by level." picking-mode="Ignore" class="result-subtitle" />
+                <ui:VisualElement name="resultHeader" picking-mode="Ignore" class="result-header">
+                    <ui:Label text="LEVEL" picking-mode="Ignore" class="result-level" />
+                    <ui:Label text="MOVES" picking-mode="Ignore" class="result-moves" />
+                    <ui:Label text="TIME" picking-mode="Ignore" class="result-time" />
+                </ui:VisualElement>
+                <ui:ScrollView name="resultsScroll" mode="Vertical" horizontal-scroller-visibility="Hidden" vertical-scroller-visibility="AlwaysVisible" class="result-scroll">
+                    <ui:VisualElement name="resultRows" picking-mode="Ignore" />
+                </ui:ScrollView>
+                <ui:VisualElement name="totals" picking-mode="Ignore" class="result-totals">
+                    <ui:Label text="TOTAL" picking-mode="Ignore" class="result-level" />
+                    <ui:Label name="totalMoves" text="0" picking-mode="Ignore" class="result-moves" />
+                    <ui:Label name="totalTime" text="0.0 s" picking-mode="Ignore" class="result-time" />
+                </ui:VisualElement>
+                <ui:Button name="watchFinalReplay" text="Watch replay" class="action" />
+                <ui:Button name="playAgain" class="action primary play-again">
+                    <ui:Label text="Play again" picking-mode="Ignore" class="action-title" />
+                    <ui:Label text="R" picking-mode="Ignore" class="shortcut" />
+                </ui:Button>
+            </ui:VisualElement>
+        </ui:VisualElement>
+        <ui:VisualElement name="replayPanel" class="replay-panel controls-panel">
+            <ui:Label text="REPLAY" picking-mode="Ignore" class="eyebrow" />
+            <ui:Label name="replayMessage" picking-mode="Ignore" class="detail" />
+            <ui:Button name="pauseReplay" text="Pause" class="action" />
+            <ui:Button name="backFromReplay" text="Back to results" class="action primary" />
+        </ui:VisualElement>
+        <ui:Instance template="resultRow" name="resultRowTemplate" picking-mode="Ignore" class="hidden" />
+    </ui:VisualElement>
+    <ui:Instance template="characterSelection" picking-mode="Ignore" class="selection-host" />
+</ui:UXML>

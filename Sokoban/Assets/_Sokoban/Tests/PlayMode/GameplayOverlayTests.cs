@@ -16,7 +16,7 @@ namespace Sokoban.Tests.PlayMode
 {
     public sealed class GameplayOverlayTests
     {
-        private const string Assets = "Assets/_Sokoban/Code/Unity/GameplayDebugOverlay/";
+        private const string Assets = "Assets/_Sokoban/Code/Unity/GameplayUI/";
         private GameObject _object;
         private UIDocument _document;
         private GameplayDebugOverlay _overlay;
@@ -330,7 +330,7 @@ namespace Sokoban.Tests.PlayMode
         }
 
         [UnityTest]
-        public IEnumerator CompletedNoticeIsSeparateAndDoesNotRequestOrBlockProgression()
+        public IEnumerator CompletedNoticeIsSeparateAndOnlyQueuesExplicitProgression()
         {
             _model.Results.Add(new LevelResult(6, 10f, 50f));
             _model.Phase = GameplayPhase.Completed;
@@ -338,7 +338,10 @@ namespace Sokoban.Tests.PlayMode
             yield return null;
             Assert.That(Root.Q("completed").resolvedStyle.display, Is.Not.EqualTo(DisplayStyle.None));
             Assert.That(Root.Q("results").resolvedStyle.display, Is.EqualTo(DisplayStyle.None));
-            Assert.That(Root.Q("completed").Query<Button>().ToList(), Is.Empty);
+            Assert.That(Root.Q<Button>("nextLevel").enabledSelf, Is.True);
+            Assert.That(_model.NextLevels, Is.Zero);
+            Submit(Root.Q<Button>("nextLevel"));
+            Assert.That(_model.NextLevels, Is.EqualTo(1));
             Assert.That(Root.panel.Pick(Root.worldBound.center), Is.Null);
             Assert.That(_model.Requests, Is.EqualTo(new[] { 0, 0, 0, 0, 0 }));
 
@@ -699,7 +702,7 @@ namespace Sokoban.Tests.PlayMode
                 (Phase: GameplayPhase.Playing, Class: UiIds.Phases.Playing, Notice: "",
                     Hud: true, Selection: false, Completed: false, Results: false, CompactTop: 164f),
                 (Phase: GameplayPhase.Completed, Class: UiIds.Phases.Completed, Notice: "",
-                    Hud: true, Selection: false, Completed: true, Results: false, CompactTop: 248f),
+                    Hud: true, Selection: false, Completed: true, Results: false, CompactTop: 360f),
                 (Phase: GameplayPhase.ViewsFailed, Class: UiIds.Phases.ViewsFailed, Notice: "Views unavailable. Restart to retry.",
                     Hud: true, Selection: false, Completed: false, Results: false, CompactTop: 248f),
                 (Phase: GameplayPhase.LevelFailed, Class: UiIds.Phases.LevelFailed, Notice: "Level unavailable. Restart to retry.",
@@ -711,7 +714,17 @@ namespace Sokoban.Tests.PlayMode
                 (Phase: GameplayPhase.BindingCharacter, Class: UiIds.Phases.BindingCharacter, Notice: "",
                     Hud: false, Selection: true, Completed: false, Results: false, CompactTop: 164f),
                 (Phase: GameplayPhase.CharacterFailed, Class: UiIds.Phases.CharacterFailed, Notice: "",
-                    Hud: false, Selection: true, Completed: false, Results: false, CompactTop: 164f)
+                    Hud: false, Selection: true, Completed: false, Results: false, CompactTop: 164f),
+                (Phase: GameplayPhase.ReplayLoading, Class: UiIds.Phases.ReplayLoading, Notice: "",
+                    Hud: false, Selection: false, Completed: false, Results: false, CompactTop: 164f),
+                (Phase: GameplayPhase.Replaying, Class: UiIds.Phases.Replaying, Notice: "",
+                    Hud: false, Selection: false, Completed: false, Results: false, CompactTop: 164f),
+                (Phase: GameplayPhase.ReplayPaused, Class: UiIds.Phases.ReplayPaused, Notice: "",
+                    Hud: false, Selection: false, Completed: false, Results: false, CompactTop: 164f),
+                (Phase: GameplayPhase.ReplayFinished, Class: UiIds.Phases.ReplayFinished, Notice: "",
+                    Hud: false, Selection: false, Completed: false, Results: false, CompactTop: 164f),
+                (Phase: GameplayPhase.ReplayFailed, Class: UiIds.Phases.ReplayFailed, Notice: "",
+                    Hud: false, Selection: false, Completed: false, Results: false, CompactTop: 164f)
             };
             var coveredPhases = new List<GameplayPhase>();
             var coveredClasses = new List<string>();
@@ -748,14 +761,16 @@ namespace Sokoban.Tests.PlayMode
                     Assert.That(phaseClasses, Is.EqualTo(1), "Exactly one phase class belongs to the shared overlay root.");
                     Assert.That(Root.Q<Label>(UiIds.Hud.Notice).text, Is.EqualTo(expected.Notice));
                     CheckDisplay(UiIds.Hud.Panel, expected.Hud);
-                    CheckDisplay(UiIds.Controls.Scroll, expected.Selection == false);
+                    bool replay = _model.CanBackFromReplay;
+                    CheckDisplay(UiIds.Replay.Panel, replay);
+                    CheckDisplay(UiIds.Controls.Scroll, expected.Selection == false && replay == false);
                     CheckDisplay(UiIds.Selection.Panel, expected.Selection);
                     CheckDisplay(UiIds.Results.Completed, expected.Completed);
                     CheckDisplay(UiIds.Results.Panel, expected.Results);
                     CheckDisplay(UiIds.Hud.Notice, expected.Notice.Length > 0);
                     Root.Q(UiIds.Root.Name).AddToClassList(UiIds.Classes.Compact);
                     yield return null;
-                    if (expected.Selection == false)
+                    if (expected.Selection == false && replay == false)
                     {
                         Assert.That(Root.Q(UiIds.Controls.Scroll).resolvedStyle.top, Is.EqualTo(expected.CompactTop).Within(1f));
                     }
@@ -768,6 +783,68 @@ namespace Sokoban.Tests.PlayMode
                 Assert.That(Root.Q(name).resolvedStyle.display,
                     Is.EqualTo(visible ? DisplayStyle.Flex : DisplayStyle.None), $"{_model.Phase}: {name}");
             }
+        }
+
+        [UnityTest]
+        public IEnumerator ReplayActionsForwardOnceAndRecheckAvailabilityAcrossRebinding()
+        {
+            _model.Phase = GameplayPhase.Completed;
+            yield return null;
+            Submit(Root.Q<Button>(UiIds.Results.WatchReplay));
+            Assert.That(_model.Watches, Is.EqualTo(1));
+            _model.Available = false;
+            Submit(Root.Q<Button>(UiIds.Results.WatchReplay));
+            Assert.That(_model.Watches, Is.EqualTo(1));
+            _model.Available = true;
+            _model.Phase = GameplayPhase.Replaying;
+            yield return null;
+            Button oldPause = Root.Q<Button>(UiIds.Replay.Pause);
+            Button oldBack = Root.Q<Button>(UiIds.Replay.Back);
+            _overlay.Construct(_model, _model);
+            yield return null;
+            Submit(oldPause);
+            Assert.That(_model.Pauses, Is.EqualTo(1));
+            _model.Phase = GameplayPhase.ReplayPaused;
+            yield return null;
+            Assert.That(oldPause.text, Is.EqualTo("Resume"));
+            Submit(oldBack);
+            Assert.That(_model.Backs, Is.EqualTo(1));
+            _overlay.enabled = false;
+            // Subscriptions must be gone even if old controls are made visible again.
+            Root.Q(UiIds.Root.Name).RemoveFromClassList(UiIds.Classes.Hidden);
+            Submit(oldPause);
+            Submit(oldBack);
+            Assert.That(_model.Pauses, Is.EqualTo(1));
+            Assert.That(_model.Backs, Is.EqualTo(1));
+        }
+
+        [UnityTest]
+        public IEnumerator MissingReplayControlReleasesEarlierCompletionBindings()
+        {
+            _model.Phase = GameplayPhase.Completed;
+            yield return null;
+            VisualElement missing = Root.Q(UiIds.Replay.Pause);
+            VisualElement parent = missing.parent;
+            int index = parent.IndexOf(missing);
+            missing.RemoveFromHierarchy();
+            try
+            {
+                Assert.Throws<System.InvalidOperationException>(() => _overlay.Construct(_model, _model));
+                Root.Q(UiIds.Root.Name).RemoveFromClassList(UiIds.Classes.Hidden);
+                Root.AddToClassList(UiIds.Phases.Completed);
+                Submit(Root.Q<Button>(UiIds.Results.WatchReplay));
+                Submit(Root.Q<Button>(UiIds.Results.NextLevel));
+                Assert.That(_model.Watches, Is.Zero);
+                Assert.That(_model.NextLevels, Is.Zero);
+            }
+            finally
+            {
+                parent.Insert(index, missing);
+                Root.RemoveFromClassList(UiIds.Phases.Completed);
+            }
+            yield return null;
+            Submit(Root.Q<Button>(UiIds.Results.WatchReplay));
+            Assert.That(_model.Watches, Is.EqualTo(1));
         }
 
         [Test]
@@ -831,7 +908,8 @@ namespace Sokoban.Tests.PlayMode
                 Check<Label>(tree, name);
             }
             foreach (string name in new[] { UiIds.Controls.Restart, UiIds.Controls.Undo, UiIds.Controls.Hint,
-                         UiIds.Background.Next, UiIds.Results.PlayAgain })
+                         UiIds.Background.Next, UiIds.Results.PlayAgain, UiIds.Results.NextLevel,
+                         UiIds.Results.WatchReplay, UiIds.Results.WatchFinalReplay, UiIds.Replay.Pause, UiIds.Replay.Back })
             {
                 Check<Button>(tree, name);
             }
@@ -930,6 +1008,19 @@ namespace Sokoban.Tests.PlayMode
             public List<LevelResult> Results { get; } = new();
             IReadOnlyList<LevelResult> IGameplayStatus.Results => Results;
             public bool CanRestart => Available;
+            public bool CanNextLevel => Available && Phase == GameplayPhase.Completed;
+            public int NextLevels;
+            public int Watches;
+            public int Pauses;
+            public int Backs;
+            public bool CanWatchReplay => Available && Phase is GameplayPhase.Completed or GameplayPhase.Finished;
+            public bool CanToggleReplayPause => Available && Phase is GameplayPhase.Replaying or GameplayPhase.ReplayPaused;
+            public bool CanBackFromReplay => Available && Phase is GameplayPhase.ReplayLoading or GameplayPhase.Replaying
+                or GameplayPhase.ReplayPaused or GameplayPhase.ReplayFinished or GameplayPhase.ReplayFailed;
+            public void RequestWatchReplay() => Watches++;
+            public void RequestToggleReplayPause() => Pauses++;
+            public void RequestBackFromReplay() => Backs++;
+            public void RequestNextLevel() => NextLevels++;
             public List<SkinId> Characters { get; } = new() { SkinId.Default, SkinId.Alternate, SkinId.Punk };
             IReadOnlyList<SkinId> IGameplayStatus.Characters => Characters;
             public SkinId SelectedCharacter { get; set; }

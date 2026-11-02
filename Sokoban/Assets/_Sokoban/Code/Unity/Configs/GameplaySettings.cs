@@ -7,8 +7,6 @@ namespace Sokoban.Presentation
     {
         [field: SerializeField] public float LevelTimeLimitSeconds { get; private set; } = 60f;
 
-        [field: SerializeField] public float CompletionDelaySeconds { get; private set; } = 0.75f;
-
         [field: SerializeField] public float MoveDurationSeconds { get; private set; } = 0.16f;
     }
 }

@@ -124,16 +124,28 @@ namespace Sokoban.Tests.EditMode
             _player.Set(new MoveRequest(MoveCommand.Right));
             _validation.Update(0f);
             Assert.That(_player.Get<MovementPlan>().StepCount, Is.EqualTo(2));
-            if (destroyPlayer) _player.Dispose();
-            else box.Dispose();
+            if (destroyPlayer)
+            {
+                _player.Dispose();
+            }
+            else
+            {
+                box.Dispose();
+            }
             int notifications = 0;
             using var subscription = _world.SubscribeComponentChanged<GridPosition>(
                 (in Entity entity, in GridPosition oldValue, in GridPosition newValue) => notifications++);
 
             apply.Update(0f);
 
-            if (destroyPlayer) Assert.That(box.Get<GridPosition>(), Is.EqualTo(new GridPosition(1, 0)));
-            else Assert.That(_player.Get<GridPosition>(), Is.EqualTo(new GridPosition(0, 0)));
+            if (destroyPlayer)
+            {
+                Assert.That(box.Get<GridPosition>(), Is.EqualTo(new GridPosition(1, 0)));
+            }
+            else
+            {
+                Assert.That(_player.Get<GridPosition>(), Is.EqualTo(new GridPosition(0, 0)));
+            }
             Assert.That(_world.Any(entity => entity.Has<MovementPlan>()), Is.False);
             Assert.That(notifications, Is.Zero);
         }

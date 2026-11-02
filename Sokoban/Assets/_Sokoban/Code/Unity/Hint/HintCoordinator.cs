@@ -15,7 +15,6 @@ namespace Sokoban.Presentation
 
         private long _revision;
         private bool _disposed;
-        private bool _requested;
 
         public HintStatus Status { get; private set; }
         public MoveCommand Move { get; private set; }
@@ -31,22 +30,7 @@ namespace Sokoban.Presentation
             return _disposed == false 
                    && phase == GameplayPhase.Playing 
                    && run is { CanHint: true }
-                   && _operation == null && _requested == false;
-        }
-
-        public void Request(LevelRun run, GameplayPhase phase)
-        {
-            if (CanRequest(run, phase))
-            {
-                _requested = true;
-            }
-        }
-
-        public bool ConsumeRequest()
-        {
-            bool requested = _requested;
-            _requested = false;
-            return requested;
+                   && _operation == null;
         }
 
         public void Start(LevelRun run, GameplayPhase phase)
@@ -56,8 +40,8 @@ namespace Sokoban.Presentation
                 return;
             }
             
-            Invalidate()
-                ;
+            Invalidate();
+
             _run = run;
             _revision = run.BoardRevision;
             _operation = new HintOperation(_service, run.CaptureHintBoard());
@@ -136,12 +120,14 @@ namespace Sokoban.Presentation
                     ApplyArrow(request, run, phase);
                 }
             }
-            else _operation = null;
+            else
+            {
+                _operation = null;
+            }
         }
         
         public void Invalidate()
         {
-            _requested = false;
             _operation?.Cancel();
             _operation = null;
             _run?.HideHint();
@@ -215,6 +201,5 @@ namespace Sokoban.Presentation
             }
         }
 
-       
     }
 }

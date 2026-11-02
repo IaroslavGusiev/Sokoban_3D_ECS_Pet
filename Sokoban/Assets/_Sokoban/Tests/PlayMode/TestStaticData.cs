@@ -12,16 +12,24 @@ namespace Sokoban.Tests.PlayMode
         public LevelConfig[] Levels = { new("levels/level-01"), new("levels/level-02") };
         public UniTaskCompletionSource Pending;
         public int LoadCalls;
+        public int GameplayReads;
         public int LevelCount => Levels.Length;
 
         public async UniTask LoadAsync(CancellationToken cancellationToken)
         {
             LoadCalls++;
             cancellationToken.ThrowIfCancellationRequested();
-            if (Pending != null) await Pending.Task.AttachExternalCancellation(cancellationToken);
+            if (Pending != null)
+            {
+                await Pending.Task.AttachExternalCancellation(cancellationToken);
+            }
         }
 
-        public GameplaySettings GetGameplaySettings() => Gameplay;
+        public GameplaySettings GetGameplaySettings()
+        {
+            GameplayReads++;
+            return Gameplay;
+        }
         public BackgroundCatalog GetBackgroundCatalog() => Backgrounds;
         public ViewCatalog GetViewCatalog() => Views;
         public LevelConfig GetLevelConfig(int levelIndex) => Levels[levelIndex];

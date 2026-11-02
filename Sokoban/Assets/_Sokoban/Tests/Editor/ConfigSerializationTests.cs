@@ -13,10 +13,9 @@ namespace Sokoban.Tests.Editor
             var restored = ScriptableObject.CreateInstance<GameplaySettings>();
             try
             {
-                JsonUtility.FromJsonOverwrite("{\"<LevelTimeLimitSeconds>k__BackingField\":17.5,\"<CompletionDelaySeconds>k__BackingField\":1.25,\"<MoveDurationSeconds>k__BackingField\":0.3}", config);
+                JsonUtility.FromJsonOverwrite("{\"<LevelTimeLimitSeconds>k__BackingField\":17.5,\"<MoveDurationSeconds>k__BackingField\":0.3}", config);
                 JsonUtility.FromJsonOverwrite(JsonUtility.ToJson(config), restored);
                 Assert.That(restored.LevelTimeLimitSeconds, Is.EqualTo(17.5f));
-                Assert.That(restored.CompletionDelaySeconds, Is.EqualTo(1.25f));
                 Assert.That(restored.MoveDurationSeconds, Is.EqualTo(0.3f));
             }
             finally

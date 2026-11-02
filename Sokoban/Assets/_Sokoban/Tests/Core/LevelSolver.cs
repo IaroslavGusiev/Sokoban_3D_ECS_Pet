@@ -25,17 +25,26 @@ namespace Sokoban.CoreTests
             while (queue.Count > 0)
             {
                 State state = queue.Dequeue();
-                if (state.Boxes.All(goals.Contains)) return Reconstruct(state, level.Width);
+                if (state.Boxes.All(goals.Contains))
+                {
+                    return Reconstruct(state, level.Width);
+                }
 
                 foreach (MoveCommand move in Moves)
                 {
-                    if (!TryStep(state.Player, move, level, walls, out int destination)) continue;
+                    if (!TryStep(state.Player, move, level, walls, out int destination))
+                    {
+                        continue;
+                    }
                     int boxIndex = Array.BinarySearch(state.Boxes, destination);
                     int[] boxes = state.Boxes;
                     if (boxIndex >= 0)
                     {
                         if (!TryStep(destination, move, level, walls, out int boxDestination)
-                            || Array.BinarySearch(boxes, boxDestination) >= 0) continue;
+                            || Array.BinarySearch(boxes, boxDestination) >= 0)
+                        {
+                            continue;
+                        }
 
                         boxes = (int[])boxes.Clone();
                         boxes[boxIndex] = boxDestination;
@@ -43,7 +52,10 @@ namespace Sokoban.CoreTests
                     }
 
                     var next = new State(destination, boxes, state, move);
-                    if (!visited.Add(next)) continue;
+                    if (!visited.Add(next))
+                    {
+                        continue;
+                    }
                     if (visited.Count > StateCap)
                     {
                         throw new InvalidOperationException($"Level is too complex or unsolvable: exceeded the {StateCap:N0}-state BFS cap.");
@@ -109,7 +121,10 @@ namespace Sokoban.CoreTests
                 unchecked
                 {
                     int hash = Player;
-                    foreach (int box in Boxes) hash = hash * 397 ^ box;
+                    foreach (int box in Boxes)
+                    {
+                        hash = hash * 397 ^ box;
+                    }
                     return hash;
                 }
             }

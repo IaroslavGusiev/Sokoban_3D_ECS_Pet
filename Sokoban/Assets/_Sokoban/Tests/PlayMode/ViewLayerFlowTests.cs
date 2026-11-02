@@ -24,11 +24,20 @@ namespace Sokoban.Tests.PlayMode
         [UnityTearDown]
         public IEnumerator TearDown()
         {
-            foreach (ViewLayer layer in _layers) layer.Dispose();
-            foreach (World world in _worlds) world.Dispose();
+            foreach (ViewLayer layer in _layers)
+            {
+                layer.Dispose();
+            }
+            foreach (World world in _worlds)
+            {
+                world.Dispose();
+            }
             foreach (GameObject target in _objects)
             {
-                if (target != null) UnityEngine.Object.Destroy(target);
+                if (target != null)
+                {
+                    UnityEngine.Object.Destroy(target);
+                }
             }
             _layers.Clear();
             _worlds.Clear();
@@ -64,7 +73,10 @@ namespace Sokoban.Tests.PlayMode
             Assert.That(fixture.Layer.Status, Is.EqualTo(ViewStatus.Binding));
             Assert.That(fixture.Root.childCount, Is.Zero);
             Assert.That(provider.Calls, Is.EqualTo(fixture.Entities.Length));
-            for (int index = 0; index < provider.Calls - 1; index++) provider.Complete(index);
+            for (int index = 0; index < provider.Calls - 1; index++)
+            {
+                provider.Complete(index);
+            }
             await UniTask.Yield();
             fixture.Layer.Tick(0f);
             Assert.That(fixture.Layer.Status, Is.EqualTo(ViewStatus.Binding));
@@ -80,9 +92,15 @@ namespace Sokoban.Tests.PlayMode
         {
             var provider = new FakeViewProvider(_ => CreateObject("Pending prefab")) { Hold = true };
             var fixture = CreateLayer(provider);
-            for (int index = 0; index < 20; index++) fixture.Layer.Tick(0f);
+            for (int index = 0; index < 20; index++)
+            {
+                fixture.Layer.Tick(0f);
+            }
             Assert.That(provider.Calls, Is.EqualTo(fixture.Entities.Length));
-            foreach (Entity entity in fixture.Entities) Assert.That(entity.Has<ViewPending>(), Is.True);
+            foreach (Entity entity in fixture.Entities)
+            {
+                Assert.That(entity.Has<ViewPending>(), Is.True);
+            }
             await UniTask.Yield();
         });
 
@@ -99,7 +117,10 @@ namespace Sokoban.Tests.PlayMode
                 Assert.That(entity.Has<ViewPending>(), Is.False);
                 Assert.That(entity.Has<TransformComponent>(), Is.False);
             }
-            for (int index = 0; index < 20; index++) fixture.Layer.Tick(0f);
+            for (int index = 0; index < 20; index++)
+            {
+                fixture.Layer.Tick(0f);
+            }
             Assert.That(provider.Calls, Is.EqualTo(fixture.Entities.Length));
             await UniTask.Yield();
         });
@@ -114,10 +135,16 @@ namespace Sokoban.Tests.PlayMode
             Transform parent = fixture.Root.parent;
             fixture.Layer.Dispose();
             _layers.Remove(fixture.Layer);
-            for (int index = 0; index < provider.Calls; index++) provider.Complete(index);
+            for (int index = 0; index < provider.Calls; index++)
+            {
+                provider.Complete(index);
+            }
             await UniTask.NextFrame();
             Assert.That(parent.childCount, Is.Zero);
-            foreach (Entity entity in fixture.Entities) Assert.That(entity.Has<TransformComponent>(), Is.False);
+            foreach (Entity entity in fixture.Entities)
+            {
+                Assert.That(entity.Has<TransformComponent>(), Is.False);
+            }
             LogAssert.NoUnexpectedReceived();
         });
 
@@ -298,8 +325,14 @@ namespace Sokoban.Tests.PlayMode
             Entity levelState = default;
             foreach (Entity entity in simulation.World)
             {
-                if (entity.Has<GridPosition>()) before.Add(entity, entity.Get<GridPosition>());
-                if (entity.Has<LevelStateTag>()) levelState = entity;
+                if (entity.Has<GridPosition>())
+                {
+                    before.Add(entity, entity.Get<GridPosition>());
+                }
+                if (entity.Has<LevelStateTag>())
+                {
+                    levelState = entity;
+                }
             }
             float remaining = simulation.RemainingSeconds;
             int moves = simulation.Result.Moves;
@@ -308,7 +341,9 @@ namespace Sokoban.Tests.PlayMode
             layer.Tick(0f);
             await UniTask.NextFrame();
             foreach (KeyValuePair<Entity, GridPosition> position in before)
+            {
                 Assert.That(position.Key.Get<GridPosition>(), Is.EqualTo(position.Value));
+            }
             Assert.That(levelState.Has<TransformComponent>() || levelState.Has<ViewSkin>(), Is.False);
             Assert.That(simulation.RemainingSeconds, Is.EqualTo(remaining));
             Assert.That(simulation.Result.Moves, Is.EqualTo(moves));
@@ -442,8 +477,14 @@ namespace Sokoban.Tests.PlayMode
             {
                 var completion = new UniTaskCompletionSource<GameObject>();
                 _requests.Add((key, completion));
-                if (Failure != null) completion.TrySetException(Failure);
-                else if (!Hold) completion.TrySetResult(_prefab(key));
+                if (Failure != null)
+                {
+                    completion.TrySetException(Failure);
+                }
+                else if (!Hold)
+                {
+                    completion.TrySetResult(_prefab(key));
+                }
                 return completion.Task.AttachExternalCancellation(ct);
             }
 

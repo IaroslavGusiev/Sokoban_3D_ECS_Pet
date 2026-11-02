@@ -16,8 +16,13 @@ namespace Sokoban.Core
         public SimulationReplay(SimulationRecording recording)
         {
             _recording = recording ?? throw new ArgumentNullException(nameof(recording));
-            _simulation = new Simulation(recording.InitialLevel, new LevelPopulator(), recording.TimeLimitSeconds,
-                new SimulationPipelineFactory().Create, recordInputs: false);
+            
+            _simulation = new Simulation(
+                recording.InitialLevel, 
+                new LevelPopulator(), 
+                recording.TimeLimitSeconds, 
+                new SimulationPipelineFactory().Create, 
+                recordInputs: false);
         }
 
         public bool Step()
@@ -30,20 +35,25 @@ namespace Sokoban.Core
             try
             {
                 SimulationInput input = _recording.Inputs[_nextInput];
+                
                 switch (input.Kind)
                 {
                     case SimulationInputKind.Move:
                         Simulation.Send(input.Command);
                         break;
+                    
                     case SimulationInputKind.Undo:
                         Simulation.RequestUndo();
                         break;
+                    
                     case SimulationInputKind.Tick:
                         Simulation.Tick(input.DeltaTime);
                         break;
+                    
                     default:
                         throw new InvalidOperationException($"Unsupported simulation input: {input.Kind}.");
                 }
+                
                 _nextInput++;
                 return true;
             }
