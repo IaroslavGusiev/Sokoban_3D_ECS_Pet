@@ -161,8 +161,7 @@ namespace Sokoban.Presentation
         private GameplayRequests ConsumeRequests(out SkinId? requestedCharacter, out bool nextSkinRequested)
         {
             GameplayRequests requests = _commands.Consume(out requestedCharacter);
-
-            // Clear the inbox before effects; these flags must also satisfy current live eligibility.
+            
             if ((requests & GameplayRequests.Restart) != 0 && CanRestart == false)
             {
                 requests &= ~GameplayRequests.Restart;
