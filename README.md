@@ -2,9 +2,7 @@
 
 A small, playable 3D Sokoban learning project. It explores deterministic ECS rules, object-oriented application infrastructure, and safe asynchronous presentation loading. It keeps simulation rules independent of Unity while giving them a playable presentation.
 
-![Level one during gameplay, showing the character, wooden crates, marked goal cells and compact HUD](docs/media/gameplay.png)
-
-*Static gameplay screenshot from the saved scene.*
+![First-level gameplay, the winning push, completion controls and playback of the same six-move solution](docs/media/level-one-gameplay-replay.gif)
 
 ## Engineering highlights
 
